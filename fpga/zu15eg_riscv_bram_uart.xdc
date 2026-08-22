@@ -1,0 +1,10 @@
+create_clock -name PL_REFCLK_200M -period 5.000 [get_ports pl_ref_clk_p]
+set_property -dict {PACKAGE_PIN AL5 IOSTANDARD LVDS} [get_ports pl_ref_clk_n]
+set_property -dict {PACKAGE_PIN AL6 IOSTANDARD LVDS} [get_ports pl_ref_clk_p]
+
+set_property -dict {PACKAGE_PIN AE13 IOSTANDARD LVCMOS33} [get_ports pl_uart_rx]
+set_property -dict {PACKAGE_PIN AG13 IOSTANDARD LVCMOS33} [get_ports pl_uart_tx]
+set_property -dict {PACKAGE_PIN AK13 IOSTANDARD LVCMOS33} [get_ports rs485_de_re]
+set_property -dict {PACKAGE_PIN AH14 IOSTANDARD LVCMOS33} [get_ports rs485_di]
+set_property -dict {PACKAGE_PIN AH13 IOSTANDARD LVCMOS33} [get_ports rs485_ro]
+set_property -dict {PACKAGE_PIN J17 IOSTANDARD LVCMOS33} [get_ports status_led]

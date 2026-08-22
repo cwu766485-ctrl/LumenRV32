@@ -1,0 +1,4 @@
+# Licensed third-party VIP and local project configuration are deliberately local.
+vip_paths.local.ps1
+vendor/
+work/

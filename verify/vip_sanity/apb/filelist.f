@@ -1,0 +1,11 @@
+../../../rtl/core/defines.v
+../../../rtl/perips/timer.v
+../../../rtl/perips/uart.v
+../../../rtl/perips/gpio.v
+../../../rtl/perips/spi.v
+../../../rtl/perips/qspi.v
+../../../rtl/perips/i2c_master.v
+../../../rtl/perips/pmu.v
+../../../rtl/perips/dma.v
+../../../rtl/perips/apb_perips.v
+apb_perips_vip_harness.sv
