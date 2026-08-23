@@ -51,6 +51,10 @@ powershell -ExecutionPolicy Bypass -File .\tools\run_sw_example.ps1 -ExampleName
 
 See [docs/README.md](docs/README.md) for architecture, verification, implementation, and resume-facing notes.
 
+The current CPU-focused ZU15EG profile has a fresh 100 MHz post-route result; see
+[the implementation record](docs/validation/zu15eg_cpu_profile_100mhz.md). Board execution is a
+separate acceptance step.
+
 ## Attribution
 
 This repository retains required upstream Apache-2.0 notices in `LICENSE` and `NOTICE`. Do not remove third-party attribution from inherited files.

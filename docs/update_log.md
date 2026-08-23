@@ -2,6 +2,15 @@
 
 ## 2026-08-23 +08:00
 
+### Fresh ZU15EG CPU-profile implementation
+
+- Rebuilt the CPU + AXI + PMU + JTAG/debug profile for `xczu15eg-ffvb1156-2-i` with `FPGA_CPU_CLK_DIV=2` (100 MHz from the 200 MHz reference clock).
+- Post-route timing: WNS `+1.163 ns`, TNS `0`, WHS `+0.012 ns`, THS `0`. Utilization: `19,183` LUT, `15,324` registers, `16` BRAM tiles, and `4` DSPs. Bitstream generation completed successfully.
+- Fixed `tools/build_zu15eg_cpu_profile.tcl` to reopen `impl_1` after `wait_on_run` before generating final reports. The first completed implementation was valid, but the old Tcl incorrectly attempted reporting without an open design.
+- This is implementation evidence only. No current-commit board execution was performed, and 125 MHz or higher was not attempted because the measured 8.837 ns setup path does not support a 125 MHz period.
+
+## 2026-08-23 +08:00
+
 ### English public documentation refresh
 
 - Reworked the public README, architecture/specification, status, resume notes, and JALR timing case study for an external engineering reader.

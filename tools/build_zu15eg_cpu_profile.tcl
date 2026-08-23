@@ -37,6 +37,7 @@ launch_runs impl_1 -to_step write_bitstream -jobs $jobs
 wait_on_run impl_1
 set status [get_property STATUS [get_runs impl_1]]
 if {![string match "*write_bitstream Complete*" $status]} { error "Implementation failed: $status" }
+open_run impl_1
 set run_dir [get_property DIRECTORY [get_runs impl_1]]
 file copy -force [file join $run_dir ${top_name}.bit] [file join $out_dir ${top_name}.bit]
 report_timing_summary -file [file join $out_dir timing.rpt]
