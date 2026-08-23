@@ -62,13 +62,30 @@ module jtag_top #(
     wire dm_op_req_o;
     wire dm_halt_req_o;
     wire dm_reset_req_o;
+    wire tck_rst_n;
+    wire cpu_rst_n;
+
+    // JTAG TCK and the SoC clock are asynchronous. Assertion of the
+    // external reset is immediate; deassertion is synchronized independently
+    // in the TCK and CPU domains before their DMI handshake endpoints run.
+    jtag_cdc_reset_sync u_tck_reset_sync(
+        .clk(jtag_pin_TCK),
+        .arst_n(jtag_rst_n),
+        .srst_n(tck_rst_n)
+    );
+
+    jtag_cdc_reset_sync u_cpu_reset_sync(
+        .clk(clk),
+        .arst_n(jtag_rst_n),
+        .srst_n(cpu_rst_n)
+    );
 
     jtag_driver #(
         .DMI_ADDR_BITS(DMI_ADDR_BITS),
         .DMI_DATA_BITS(DMI_DATA_BITS),
         .DMI_OP_BITS(DMI_OP_BITS)
     ) u_jtag_driver(
-        .rst_n(jtag_rst_n),
+        .rst_n(tck_rst_n),
         .jtag_TCK(jtag_pin_TCK),
         .jtag_TDI(jtag_pin_TDI),
         .jtag_TMS(jtag_pin_TMS),
@@ -87,7 +104,7 @@ module jtag_top #(
         .DMI_OP_BITS(DMI_OP_BITS)
     ) u_jtag_dm(
         .clk(clk),
-        .rst_n(jtag_rst_n),
+        .rst_n(cpu_rst_n),
         .dm_ack_o(dm_ack_o),
         .dtm_req_valid_i(dtm_req_valid_o),
         .dtm_req_data_i(dtm_req_data_o),

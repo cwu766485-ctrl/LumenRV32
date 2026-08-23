@@ -11,7 +11,7 @@ The public repository contains the CPU/DMA edition only. It deliberately exclude
 - I-Cache, D-Cache, prefetch queue, two-entry store queue, BTB and 2-bit BHT.
 - CPU instruction/data and DMA paths connected through native-to-AXI4 adapters.
 - AXI4-Lite control island and AXI-to-APB path for DMA, UART, timer, GPIO, SPI, QSPI, I2C, and PMU registers.
-- PMU event counters and JTAG debug RTL for execution and bottleneck observability.
+- PMU event counters and JTAG debug RTL with a bidirectional asynchronous DMI handshake.
 - Focused SystemVerilog/Verilog testbenches and source-only bare-metal examples.
 
 ## Architecture

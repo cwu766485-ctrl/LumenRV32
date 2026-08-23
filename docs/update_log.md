@@ -2,6 +2,16 @@
 
 ## 2026-08-23 +08:00
 
+### JTAG DMI CDC hardening
+
+- Marked the existing request and acknowledge two-flop chains in `full_handshake_tx` and `full_handshake_rx` with `ASYNC_REG`; the source data bundle remains stable for the complete four-phase handshake.
+- Added independent asynchronous-assert, synchronous-release reset handling for the TCK and CPU domains in `jtag_top`.
+- Added `jtag_dmi_cdc_tb.sv` and its XSim launcher. The asynchronous 58.8 MHz TCK / 100 MHz CPU test transfers four 40-bit requests and four responses without loss, duplication, or payload mismatch: `JTAG_DMI_CDC_TB_PASS`.
+- Re-ran the public bare-metal `simple` SoC smoke: `TEST_PASS`, 3250 cycles and 2010 instructions.
+- This is directed simulation evidence only. No CDC static-tool sign-off, active-TCK FPGA integration, or board validation is claimed.
+
+## 2026-08-23 +08:00
+
 ### Fresh ZU15EG CPU-profile implementation
 
 - Rebuilt the CPU + AXI + PMU + JTAG/debug profile for `xczu15eg-ffvb1156-2-i` with `FPGA_CPU_CLK_DIV=2` (100 MHz from the 200 MHz reference clock).

@@ -37,8 +37,10 @@ module full_handshake_rx #(
     localparam STATE_WAIT_REQ_DROP = 1'b1;
 
     reg state;
-    reg req_sync_d;
-    reg req_sync;
+    // req_i is generated in the transmitting clock domain. Preserve this
+    // two-flop chain as a CDC synchronizer during synthesis and placement.
+    (* ASYNC_REG = "TRUE" *) reg req_sync_d;
+    (* ASYNC_REG = "TRUE" *) reg req_sync;
     reg ack_r;
     reg recv_rdy_r;
     reg[DW - 1:0] recv_data_r;
@@ -66,6 +68,9 @@ module full_handshake_rx #(
                     if (req_sync == 1'b1) begin
                         ack_r <= 1'b1;
                         recv_rdy_r <= 1'b1;
+                        // req_data_i is an unsynchronized bundle by design.
+                        // The transmitter holds it stable from req assertion
+                        // through the full acknowledge handshake.
                         recv_data_r <= req_data_i;
                         state <= STATE_WAIT_REQ_DROP;
                     end

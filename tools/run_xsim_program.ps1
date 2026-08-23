@@ -112,6 +112,7 @@ $sourceFiles = @(
     (Join-Path $root "rtl\perips\axi4_mem_model.v"),
     (Join-Path $root "rtl\debug\jtag_dm.v"),
     (Join-Path $root "rtl\debug\jtag_driver.v"),
+    (Join-Path $root "rtl\utils\jtag_cdc_reset_sync.v"),
     (Join-Path $root "rtl\debug\jtag_top.v"),
     (Join-Path $root "rtl\debug\uart_debug.v"),
     (Join-Path $root "rtl\soc\heterogeneous_soc_top.v"),

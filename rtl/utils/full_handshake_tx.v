@@ -39,8 +39,10 @@ module full_handshake_tx #(
     localparam STATE_WAIT_ACK_DROP = 2'b10;
 
     reg[1:0] state;
-    reg ack_sync_d;
-    reg ack_sync;
+    // ack_i is generated in the receiving clock domain. Preserve this
+    // two-flop chain as a CDC synchronizer during synthesis and placement.
+    (* ASYNC_REG = "TRUE" *) reg ack_sync_d;
+    (* ASYNC_REG = "TRUE" *) reg ack_sync;
     reg idle_r;
     reg req_r;
     reg[DW - 1:0] req_data_r;
@@ -69,6 +71,9 @@ module full_handshake_tx #(
                     if (req_i == 1'b1) begin
                         idle_r <= 1'b0;
                         req_r <= 1'b1;
+                        // Keep the bundle stable until the remote side has
+                        // acknowledged it. The receiver samples the bundle
+                        // only after req has crossed its two-flop synchronizer.
                         req_data_r <= req_data_i;
                         state <= STATE_WAIT_ACK;
                     end
