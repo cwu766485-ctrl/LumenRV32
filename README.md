@@ -2,7 +2,7 @@
 
 这是一个可综合、可验证的单核 RISC-V SoC 工程。公开版以 `RV32IM` 五级顺序流水 CPU 为中心，包含 I-Cache、D-Cache、BTB/2-bit BHT、prefetch queue、store queue、PMU、JTAG/debug、AXI4/AXI4-Lite/APB 互连、DMA 与 UART/I2C/SPI/QSPI/GPIO/Timer 等外设。
 
-当前主线：`feature/zu15eg-soc`。
+当前公开分支：`main`。
 
 ## 架构
 
@@ -16,7 +16,7 @@ DMA AXI4 master ---------------------+--> AXI4 crossbar
 ```
 
 - CPU：RV32IM、单发射五级流水，带旁路、load-use stall、分支预测、I/D Cache 与 PMU。
-- AXI：crossbar 实现了受限 multi-outstanding、ID 路由和 cross-ID read response reordering；CPU/DMA native adapter 当前仍只发 local ID 0。
+- AXI：CPU I/D 与 DMA 通过 native-to-AXI4 adapter 接入 crossbar；当前 fabric 只有一个全局 outstanding transaction，不支持 AXI ID、多 outstanding、乱序返回或 write-data interleaving。
 - 控制面：`0x2000_5000` 是 DMA AXI4-Lite；其余低速寄存器经 AXI-to-APB 到 UART、Timer、GPIO、SPI、QSPI、I2C、PMU。
 - 板级：ZU15EG 的 BRAM/UART 和 DDR4 CPU/DMA smoke 有历史验收记录；任何 RTL 修改后必须重新构建并复验，不可复用旧结论。
 

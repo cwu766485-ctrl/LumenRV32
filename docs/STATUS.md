@@ -7,7 +7,7 @@
 - RV32IM 单发射五级流水 CPU：I/D Cache、BTB/2-bit BHT、prefetch queue、store queue、PMU、JTAG/debug。
 - AXI4 数据面：CPU instruction/data、DMA 与 ROM/RAM/DDR/EXTMEM/control island 的互连。
 - AXI4-Lite/APB 控制面：DMA 和 UART、Timer、GPIO、SPI、QSPI、I2C、PMU 等外设。
-- AXI fabric：受限 multi-outstanding、ID-aware response routing 与 cross-ID read OoO 的 RTL/专项验证；不应称为商业级完整 AXI fabric。
+- AXI fabric：CPU I/D 和 DMA 可访问的单全局-outstanding crossbar；尚不支持 AXI ID、多 outstanding、ID-aware response routing、OoO 或 write-data interleaving，不能称为商业级完整 AXI fabric。
 - 28 nm DC CPU profile 与 ZU15EG CPU-focused FPGA PPA 的脚本入口。
 - `verify/vip_sanity/`：APB、AXI4、AXI4-Lite、UART、I2C、SPI 的独立 DUT harness。
 

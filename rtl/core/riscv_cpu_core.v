@@ -286,6 +286,20 @@ module riscv_cpu_core #(
         (((id_reg1_raddr_o != `ZeroReg) && (id_reg1_raddr_o == ex_reg_waddr_o)) ||
          ((id_reg2_raddr_o != `ZeroReg) && (id_reg2_raddr_o == ex_reg_waddr_o)));
 
+    // Timing/IPC trade-off for indirect jumps:
+    //
+    // A JALR immediately consuming an ALU result previously formed a long
+    // EX-result -> forwarding mux -> ID/EX op1_jump path.  Keep EX forwarding
+    // for normal ALU and branch consumers, but insert one bubble only for this
+    // JALR RAW case.  id.v then selects its target base from MEM/WB forwarding.
+    // Loads remain covered by load_hazard_flag above.
+    wire jalr_ex_alu_hazard_flag = (id_inst_o[6:0] == `INST_JALR) &&
+                                   !ex_mem_load_o &&
+                                   (id_reg1_raddr_o != `ZeroReg) &&
+                                   (ex_reg_we_o == `WriteEnable) &&
+                                   (id_reg1_raddr_o == ex_reg_waddr_o);
+    wire id_hazard_flag = load_hazard_flag || jalr_ex_alu_hazard_flag;
+
     // Do not gate an ID-stage prediction with ctrl_hold_flag_o.  ctrl consumes
     // fetch_hold_flag_o, while a prediction redirect flushes ifetch; using the
     // aggregated ctrl output here formed a combinational loop:
@@ -294,7 +308,7 @@ module riscv_cpu_core #(
     //
     // Only the independent backend blockers are relevant to accepting a new
     // prediction.  The actual EX/trap redirect still has priority below.
-    wire id_predict_blocked = mem_hold_flag_o || load_hazard_flag ||
+    wire id_predict_blocked = mem_hold_flag_o || id_hazard_flag ||
                               ex_hold_flag_o || clint_hold_flag_o ||
                               jtag_halt_flag_i || ex_jump_flag_o;
     wire id_predict_accept = id_predict_taken_o && !id_predict_blocked;
@@ -357,7 +371,7 @@ module riscv_cpu_core #(
         .jump_addr_i(ex_jump_addr_o),
         .hold_flag_ex_i(ex_hold_flag_o),
         .hold_flag_mem_i(mem_hold_flag_o),
-        .hold_flag_load_i(load_hazard_flag),
+        .hold_flag_load_i(id_hazard_flag),
         .hold_flag_if_i(fetch_hold_flag_o || if_replay_hold_o),
         .hold_flag_o(ctrl_hold_flag_o),
         .hold_flag_clint_i(clint_hold_flag_o),
@@ -372,7 +386,7 @@ module riscv_cpu_core #(
     // consumed once with a frozen PC and then fetched a second time.
     assign fetch_resp_ready_o = (~if_replay_hold_o) &&
                                 (~mem_hold_flag_o) &&
-                                (~load_hazard_flag);
+                                (~id_hazard_flag);
 
     ifetch u_ifetch(
         .clk(clk),

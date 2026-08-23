@@ -16,7 +16,7 @@
 
 - CPU instruction/data 与 DMA 经 native-to-AXI4 adapter 接入 AXI4 crossbar。
 - slave：ROM、RAM、EXTMEM/DDR bridge、AXI4-Lite control island。
-- crossbar RTL 具备受限 multi-outstanding、ID response routing 和 cross-ID read OoO；CPU/DMA adapter 当前只发 local ID 0，write data 不支持 AXI3 式 WID interleaving。
+- crossbar RTL 当前仅允许一个全局 outstanding transaction；不具备 AXI ID、multi-outstanding、ID response routing、cross-ID read OoO 或 write-data interleaving。
 - CPU 与 DMA 共享数据由软件完成 cache maintenance 与所有权管理。
 
 ## 4. 控制与外设

@@ -92,7 +92,11 @@ set core_dir [file join $REPO_ROOT rtl core]
 set existing_search_path [get_app_var search_path]
 set_app_var search_path [concat [list $core_dir] $existing_search_path]
 set_app_var target_library [list $max_lib]
-set_app_var link_library [concat "*" [list $max_lib $sram_max_lib]]
+set link_libs [list "*" $max_lib]
+if {$use_sram_macro} {
+    lappend link_libs $sram_max_lib
+}
+set_app_var link_library $link_libs
 if {$min_lib ne ""} {
     set_min_library $max_lib -min_version $min_lib
 }
@@ -157,6 +161,14 @@ if {[sizeof_collection $timing_outputs] > 0} {
     set_output_delay $io_ns -clock core_clk $timing_outputs
 }
 
+# The JALR timing harness exposes the ID/EX result only to keep the cone from
+# being optimized away.  Its top-level output is not an I/O timing endpoint;
+# compare the registered producer-to-ID/EX paths instead of a register-to-pad
+# path with an arbitrary output delay.
+if {$top eq "jalr_timing_cone_top"} {
+    set_false_path -to $timing_outputs
+}
+
 # Do not enable retiming or clock-gating inference in the baseline.  Both are
 # valid later experiments, but would obscure architectural comparison and need
 # separate functional/DFT/power validation.
@@ -172,6 +184,29 @@ redirect -file [file join $out_dir timing_setup.rpt]     { report_timing -delay 
 redirect -file [file join $out_dir timing_hold.rpt]      { report_timing -delay min -max_paths 20 -transition_time -nets -attributes }
 redirect -file [file join $out_dir constraints.rpt]      { report_constraint -all_violators }
 redirect -file [file join $out_dir power_vectorless.rpt] { report_power }
+if {$top eq "jalr_timing_cone_top"} {
+    # Explicit A/B evidence for the architectural change.  In the baseline
+    # the first report contains the EX feedback cone; after the interlock it
+    # must have no path.  The second report measures the replacement
+    # registered MEM/WB-value to ID/EX capture path.
+    set idex_to [get_pins -of_objects [get_cells -hierarchical *u_id_ex/op1_jump_reg*] -filter "direction == in"]
+    set ex_from [get_pins -of_objects [get_cells -hierarchical *producer_op2_r_reg*] -filter "direction == out"]
+    set late_from [get_pins -of_objects [get_cells -hierarchical *late_data_r_reg*] -filter "direction == out"]
+    redirect -file [file join $out_dir jalr_ex_to_idex.rpt] {
+        if {[sizeof_collection $ex_from] == 0 || [sizeof_collection $idex_to] == 0} {
+            puts "NO_MATCHING_EX_TO_IDEX_REGISTERS"
+        } else {
+            report_timing -from $ex_from -to $idex_to -delay max -max_paths 20 -transition_time -nets -attributes
+        }
+    }
+    redirect -file [file join $out_dir jalr_late_to_idex.rpt] {
+        if {[sizeof_collection $late_from] == 0 || [sizeof_collection $idex_to] == 0} {
+            puts "NO_MATCHING_LATE_TO_IDEX_REGISTERS"
+        } else {
+            report_timing -from $late_from -to $idex_to -delay max -max_paths 20 -transition_time -nets -attributes
+        }
+    }
+}
 
 write -format ddc     -hierarchy -output [file join $out_dir ${top}.ddc]
 write -format verilog -hierarchy -output [file join $out_dir ${top}_mapped.v]

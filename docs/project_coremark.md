@@ -33,7 +33,7 @@ and accelerator subsystem.
 
 ## Current AXI4 + APB BTB/BHT Baseline
 
-The current development baseline is `feature/zu15eg-soc` with the AXI4 + APB
+The current public baseline is `main` with the AXI4 + APB
 interconnect, static backward branch prediction, a four-entry frontend
 prefetch queue, corrected EX/MEM backpressure handling, a strictly ordered
 two-entry D-Cache write-through store queue, and a **32-entry** BTB with 2-bit

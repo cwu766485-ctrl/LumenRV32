@@ -152,6 +152,16 @@ module id(
                               (reg2_mem_forward_hit ? mem_reg_wdata_i :
                               (reg2_wb_forward_hit ? wb_reg_wdata_i : reg2_rdata_i));
 
+    // JALR target generation is on the EX-result -> ID feedback critical path.
+    // The core supplies a one-cycle interlock when an immediately preceding EX
+    // result produces JALR.rs1.  Therefore JALR deliberately takes its base
+    // from the later MEM/WB forwarding network, rather than retaining the
+    // long EX combinational bypass into op1_jump_o.  Ordinary ALU/branch
+    // consumers continue to use reg1_data/reg2_data and keep zero-bubble EX
+    // forwarding.
+    wire[`RegBus] reg1_late_data = reg1_mem_forward_hit ? mem_reg_wdata_i :
+                                   (reg1_wb_forward_hit ? wb_reg_wdata_i : reg1_rdata_i);
+
     always @ (*) begin
         // 默认值很重要：
         // - always @(*) 是组合逻辑，不保存状态。
@@ -360,7 +370,11 @@ module id(
                 reg_waddr_o = rd;
                 op1_o = inst_addr_i;
                 op2_o = 32'h4;
-                op1_jump_o = reg1_data;
+                // See reg1_late_data above.  riscv_cpu_core interlocks an
+                // EX->JALR RAW dependency, so the first accepted JALR cycle
+                // observes this operand from MEM/WB or the register file.
+                reg1_rdata_o = reg1_late_data;
+                op1_jump_o = reg1_late_data;
                 op2_jump_o = {{20{inst_i[31]}}, inst_i[31:20]};
             end
             // LUI，opcode=7'b0110111：

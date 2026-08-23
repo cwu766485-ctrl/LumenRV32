@@ -26,6 +26,9 @@ xelab.log
 xelab.pb
 xvlog.log
 xvlog.pb
+command.log
+filenames.log
+default.svf
 
 # Generated local binaries / logs
 sim/out_probe.vvp

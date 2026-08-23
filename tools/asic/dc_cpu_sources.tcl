@@ -35,6 +35,16 @@ set CORE_RTL_FILES [list \
     [file join $core_dir riscv_cpu_core.v] \
 ]
 
+if {[info exists ::env(ASIC28_TOP)] && $::env(ASIC28_TOP) eq "jalr_timing_cone_top"} {
+    set CORE_RTL_FILES [list \
+        [file join $core_dir defines.v] \
+        [file join $core_dir ex.v] \
+        [file join $core_dir id.v] \
+        [file join $core_dir id_ex.v] \
+        [file join $REPO_ROOT rtl soc jalr_timing_cone_top.v] \
+    ]
+}
+
 if {[info exists CPU_AXI_DEBUG_PROFILE] && $CPU_AXI_DEBUG_PROFILE} {
     set profile_dirs [list \
         [file join $REPO_ROOT rtl interconnect] \
