@@ -1,5 +1,13 @@
 # 项目更新日志
 
+## 2026-08-24 +08:00
+
+### ZU15EG external raw-JTAG profile
+
+- Added `zu15eg_cpu_jtag_raw_top`, which exposes raw TCK/TMS/TDI/TDO through user-selected PL I/O while reusing the hardened DMI CDC. The static-TCK PPA profile remains unchanged.
+- Added raw-JTAG build scripts and a 50 MHz asynchronous TCK base constraint. A real FMC/PMOD/GPIO XDC is mandatory; the checked-in example deliberately has no pin assignments.
+- No dynamic-TCK bitstream, post-route result, or board acceptance is claimed until an actual connector mapping is supplied. The board USB-JTAG path would require a separate BSCANE3 user-scan adapter.
+
 ## 2026-08-23 +08:00
 
 ### JTAG DMI CDC hardening

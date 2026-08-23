@@ -32,6 +32,8 @@ Fresh result on 2026-08-23: `JTAG_DMI_CDC_TB_PASS`. The complete `simple` SoC sm
 
 ## Constraints and limits
 
-`constraints/jtag_dmi_cdc.sdc` is a template for a real top level with an external TCK port: it declares the TCK and core clocks asynchronous. The data bundle must not be blanket false-pathed; after synthesis, a flow may add datapath-only/max-delay checks using the actual register instance names.
+`fpga/zu15eg_cpu_jtag_raw_top.v` is the board wrapper for a raw four-wire PL JTAG connection. It exposes `jtag_TCK/TMS/TDI/TDO` and reuses the hardened DMI CDC. `tools/build_zu15eg_cpu_jtag_raw.ps1` requires `-JtagXdc`, a real FMC/PMOD/GPIO pin and I/O-standard mapping; the repository intentionally provides only a pin-free example.
 
-This work is RTL hardening with asynchronous-clock simulation evidence. It is not static CDC sign-off, active-TCK FPGA post-route closure, or board-level JTAG acceptance.
+The profile base XDC constrains external TCK initially at 50 MHz and declares it asynchronous to `PL_REFCLK_200M` and derived CPU clocks. The data bundle must not be blanket false-pathed; after synthesis, a flow may add datapath-only/max-delay checks using actual register instance names.
+
+This work is RTL hardening with asynchronous-clock simulation evidence. It is not static CDC sign-off, active-TCK FPGA post-route closure, or board-level JTAG acceptance. The board USB-JTAG configuration chain cannot be wired directly to this raw TAP; using that path requires a separate BSCANE3 user-scan adapter.
