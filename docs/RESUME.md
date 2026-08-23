@@ -1,41 +1,16 @@
-# heterogeneous_soc 项目介绍（公开 CPU/DMA 版）
+# Resume Notes
 
-## 项目定位
+## Suggested project title
 
-设计并验证一个以 RV32IM 单发射五级流水 CPU 为核心的 SoC。重点是把 CPU microarchitecture、存储层次、AXI/APB 互连、DMA、调试与性能观测做成可综合、可回归、可上板的工程闭环，而不是只实现单个指令级 CPU。
+**LumenRV32 — RV32IM CPU Microarchitecture and SoC Memory Path**
 
-## 核心设计
+## Suggested bullets
 
-### CPU microarchitecture
+- Designed and implemented synthesizable RTL for a single-issue five-stage RV32IM pipeline (IF/ID/EX/MEM/WB), including EX/MEM/WB forwarding, load-use interlock, branch redirect/flush, I/D Cache, prefetch queue, and BTB/2-bit BHT prediction.
+- Built the CPU memory subsystem as I/D Cache → native-to-AXI4 adapters → AXI4 fabric, separating core/cache microarchitecture from downstream protocol logic while retaining AXI4-Lite/APB control paths.
+- Added PMU counters for cycle, instruction, cache, branch, fetch, data-wait, and store-queue events; integrated JTAG debug for execution-state observability and board bring-up.
+- Refactored the EX-to-JALR forwarding feedback with a one-cycle interlock and MEM/WB late forwarding; directed RTL and bare-metal SoC tests passed, and a 28 nm SS / 5 ns DC timing-cone experiment removed the original 80-level, 4.90 ns feedback path.
 
-- Verilog 实现 RV32IM 五级顺序流水：IF、ID、EX、MEM、WB。
-- 实现 EX/MEM/WB forwarding、load-use hazard stall、flush/redirect，避免数据与控制冒险破坏提交顺序。
-- I-Cache、D-Cache、prefetch queue 和 store queue 用于缓解外部存储延迟。
-- 16/32-entry BTB 与 2-bit BHT 分支预测；通过 PMU 统计预测命中、redirect、fetch wait 和 cache miss，支持以数据驱动的性能优化。
+## Claim boundaries
 
-### SoC / interconnect
-
-- 将 CPU instruction/data path 和 DMA 封装为 native-to-AXI4 master，统一接入 AXI4 crossbar。
-- 构建 AXI4-Lite control island 与 AXI-to-APB 路径，接入 DMA、UART、Timer、GPIO、SPI、QSPI、I2C、PMU。
-- 当前 AXI crossbar 为单个全局 outstanding transaction；不支持 AXI ID、多 outstanding、乱序返回或 write-data interleaving，因此不宣称商业级高并发互连。
-- 定义 CPU/DMA 非一致性共享内存的软件 cache maintenance/ownership 边界。
-
-### Debug、验证与实现
-
-- JTAG debug module、UART 观测和 PMU 计数器用于定位 CPU 运行、总线与存储瓶颈。
-- SystemVerilog/Verilog 专项 TB 覆盖 branch predictor、D-Cache、AXI RAM path、AXI/APB、DMA 和外设。
-- 为 APB、AXI4、AXI4-Lite、UART、I2C、SPI 建立独立 DUT harness，便于接入商用或自研 VIP。
-- 完成 ZU15EG BRAM/UART、CPU/DMA DDR4 bring-up 脚本；以 ILA、mailbox、冷启动和恢复校验构建板测证据。
-- 建立 28 nm DC CPU profile：标准单元/SRAM macro 约束、setup/hold 报告、面积与 vectorless power estimate；明确 pre-layout 与 signoff 的边界。
-- 完成一项可复核的 timing-driven RTL 优化：针对 EX→JALR forwarding feedback，使用一拍 interlock 与 MEM/WB late forwarding 替代直接组合旁路；模块 TB、SoC 程序与 28 nm DC timing-cone A/B 均有新鲜证据。
-
-## 简历表述示例
-
-> Designed and implemented synthesizable RTL for a single-issue five-stage RV32IM pipeline (IF/ID/EX/MEM/WB), with forwarding, load-use interlock, branch redirect/flush, I/D Cache, prefetch queue, BTB/2-bit BHT and PMU instrumentation. Built the CPU memory path as I/D Cache → native-to-AXI4 adapters → AXI4 fabric, and completed a timing-driven EX→JALR feedback-path refactor verified by directed RTL/SoC tests and a 28 nm DC timing-cone A/B experiment.
-
-## 面试时应明确的边界
-
-- 不支持 RV32F/D、乱序执行、superscalar、MMU 或多核硬件一致性。
-- AXI 不是完整商业 fabric：当前只有一个全局 outstanding transaction；不支持 ID、多 outstanding、OoO 或 write-data interleaving。
-- 28 nm 结果为授权库下的 pre-layout 综合/STA 基线，不是 P&R 或 silicon signoff。
-- 本公开版不包含任何外部参考加速器 RTL 或其验证结论。
+The JALR result is a focused pre-layout timing-cone experiment, not a full-core Fmax, physical-signoff, or silicon claim. The public AXI fabric permits one global outstanding transaction only. Use current-commit evidence for any FPGA, CoreMark, or board metric.

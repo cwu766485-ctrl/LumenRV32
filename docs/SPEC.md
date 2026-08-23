@@ -1,38 +1,28 @@
-# heterogeneous_soc 公开版规格
+# LumenRV32 Specification
 
-## 1. 范围
+## CPU
 
-公开版是 RV32IM 单核 CPU、DMA、存储子系统和低速外设组成的可综合 SoC。它不包含外部参考加速器 RTL 或相关软件、模型和验证工件。
+- ISA: RV32IM, little-endian, single issue, in-order.
+- Pipeline: IF, ID, EX, MEM, WB.
+- Data hazards: EX/MEM/WB forwarding and load-use interlock.
+- Control hazards: EX-stage redirect/flush, BTB and 2-bit BHT prediction, frontend prefetch queue.
+- Memory hierarchy: I-Cache and D-Cache; D-Cache is direct-mapped, write-through, and no-write-allocate.
+- Performance observability: PMU counters for cycles, retired instructions, cache events, branch events, fetch/data wait, and store-queue events.
 
-## 2. CPU
+## Memory and control fabric
 
-- RV32IM、顺序、单发射、五级流水：IF / ID / EX / MEM / WB。
-- I-Cache、D-Cache、EX/MEM/WB forwarding、load-use hazard stall。
-- 16/32-entry BTB + 2-bit BHT 配置、prefetch queue、2-entry store queue。
-- PMU 统计 cycle、instruction、cache miss、branch、fetch/data wait、store queue 等事件。
-- 不含 RV32F/D、乱序执行、superscalar、MMU 或硬件 cache coherence。
+- CPU I-cache, CPU D-cache, and DMA initiate native requests through `native_to_axi4_master` adapters.
+- ROM, RAM, external memory, and the AXI4-Lite control island are AXI4 slaves.
+- DMA registers are mapped at `0x2000_5000`; other low-speed registers use the AXI-to-APB path.
+- AXI limitation: one global outstanding transaction. There are no AXI IDs, multiple outstanding transactions, out-of-order responses, or write-data interleaving.
 
-## 3. 互连与存储
+## Debug and implementation
 
-- CPU instruction/data 与 DMA 经 native-to-AXI4 adapter 接入 AXI4 crossbar。
-- slave：ROM、RAM、EXTMEM/DDR bridge、AXI4-Lite control island。
-- crossbar RTL 当前仅允许一个全局 outstanding transaction；不具备 AXI ID、multi-outstanding、ID response routing、cross-ID read OoO 或 write-data interleaving。
-- CPU 与 DMA 共享数据由软件完成 cache maintenance 与所有权管理。
+- JTAG debug logic supports debug transport and CPU halt/reset integration.
+- UART provides software-visible output during bare-metal smoke tests.
+- `tools/asic/run_dc_cpu.sh` runs local, licensed 28 nm DC synthesis. The PDK and generated reports remain local and must not be committed.
+- ZU15EG implementation scripts are available, but a changed commit must be rebuilt and revalidated before board claims are made.
 
-## 4. 控制与外设
+## Non-goals
 
-| 地址 | 接口 | 功能 |
-| --- | --- | --- |
-| `0x2000_5000` | AXI4-Lite | DMA registers |
-| 其余控制 aperture | AXI-to-APB | UART、Timer、GPIO、SPI、QSPI、I2C、PMU 等 |
-
-## 5. 验证与实现
-
-- RTL 专项：branch predictor、CPU AXI RAM path、DMA、D-Cache、AXI/APB、外设。
-- 独立 VIP harness：`verify/vip_sanity/`。
-- FPGA：ZU15EG BRAM/UART 与 CPU/DMA DDR4 smoke 入口。
-- ASIC：`tools/asic/run_dc_cpu.sh`，必须由本机授权 28 nm `.db` 和 PVT/SDC 驱动；报告为 pre-layout estimate，不能冒充 signoff。
-
-## 6. 已知边界
-
-外部参考加速器已从公开版移除。历史板测或文档中涉及该加速器的结论不适用于本公开版本；重新上板时仅可验收 CPU/DMA 路径。
+RV32F/D, superscalar execution, out-of-order execution, MMU, hardware cache coherence, AXI QoS, AXI ID/OoO routing, and ASIC signoff are outside this project scope.

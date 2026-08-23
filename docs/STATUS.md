@@ -1,31 +1,28 @@
-# 当前状态：公开 CPU/DMA 版
+# Project Status
 
-更新时间：2026-08-22。
+## Implemented RTL
 
-## 已实现
+- RV32IM single-issue five-stage CPU with I/D Cache, prefetch queue, store queue, BTB/2-bit BHT, PMU, and JTAG debug blocks.
+- CPU instruction/data and DMA native request paths connected to AXI4 memory slaves and the AXI4-Lite/APB control plane.
+- UART, timer, GPIO, SPI, QSPI, I2C, and PMU register blocks on the low-speed control path.
+- Standalone DUT harnesses prepared for APB, AXI4, AXI4-Lite, UART, I2C, and SPI VIP integration.
 
-- RV32IM 单发射五级流水 CPU：I/D Cache、BTB/2-bit BHT、prefetch queue、store queue、PMU、JTAG/debug。
-- AXI4 数据面：CPU instruction/data、DMA 与 ROM/RAM/DDR/EXTMEM/control island 的互连。
-- AXI4-Lite/APB 控制面：DMA 和 UART、Timer、GPIO、SPI、QSPI、I2C、PMU 等外设。
-- AXI fabric：CPU I/D 和 DMA 可访问的单全局-outstanding crossbar；尚不支持 AXI ID、多 outstanding、ID-aware response routing、OoO 或 write-data interleaving，不能称为商业级完整 AXI fabric。
-- 28 nm DC CPU profile 与 ZU15EG CPU-focused FPGA PPA 的脚本入口。
-- `verify/vip_sanity/`：APB、AXI4、AXI4-Lite、UART、I2C、SPI 的独立 DUT harness。
+## Fresh evidence on the current public source
 
-## 已有验证证据
+- `ID_JALR_FORWARDING_TB_PASS`.
+- `jalr_forwarding` bare-metal SoC test: `TEST_PASS`, 675 cycles, 161 instructions.
+- `simple` bare-metal SoC smoke: `TEST_PASS`, 3250 cycles, 2010 instructions.
+- 28 nm SS, 5 ns JALR timing-cone A/B documented in [validation/jalr_timing_optimization.md](validation/jalr_timing_optimization.md).
 
-- `BRANCH_PREDICTOR_TB_PASS`
-- `AXI4_CPU_RAM_PATH_PASS`
-- `VIP_SANITY_DUT_COMPILE_PASS`（APB / AXI4 / AXI4-Lite / UART / I2C / SPI）
-- ZU15EG BRAM/UART、DDR4 CPU/DMA smoke 有历史验收记录；本次公开版删除外部加速器后，需按当前 commit 重新实现并上板才可重新签收。
+## Boundaries
 
-## 公开版明确不包含
+- The AXI crossbar supports one global outstanding transaction only. AXI IDs, multiple outstanding transactions, OoO responses, and write-data interleaving are not implemented.
+- The public repository does not include external reference accelerator content.
+- Existing ZU15EG BRAM/UART and DDR4 smoke records are historical. The current public commit needs a fresh FPGA build and board run before they can be accepted again.
+- The DC flow is pre-layout. A matched min library, SRAM macro binding, CTS, physical parasitics, and signoff checks are outside the current result.
 
-- 外部参考加速器 RTL、软件、测试、工具和板测结论。
-- 多核 cache coherence、ACE/CHI、完整 AXI write-data interleaving、通用 AI 推理运行时。
-- ASIC post-layout signoff、IR/EM、DFT、UPF signoff 或真实 workload 功耗签收。
+## Next engineering work
 
-## 下一步
-
-1. 复跑 CPU、AXI/APB、DMA、D-Cache、CoreMark 与 FreeRTOS 的新鲜回归。
-2. 以当前 RTL 重新生成 ZU15EG CPU/DMA DDR4 镜像，完成冷启动稳定性和 ILA 证据归档。
-3. 围绕 PMU 的真实瓶颈做 CPU PPA 实验：分支预测、fetch、store queue 或关键路径结构优化。
+1. Run the full ISA, AXI/APB, DMA, D-Cache, CoreMark, and FreeRTOS regressions from the current commit.
+2. Rebuild the CPU/DMA ZU15EG image and repeat board smoke with archived UART/ILA evidence.
+3. Establish SRAM-aware full-core ASIC synthesis before making full-CPU PPA comparisons.

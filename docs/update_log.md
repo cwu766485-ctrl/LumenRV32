@@ -2,6 +2,14 @@
 
 ## 2026-08-23 +08:00
 
+### English public documentation refresh
+
+- Reworked the public README, architecture/specification, status, resume notes, and JALR timing case study for an external engineering reader.
+- Corrected the public AXI description to the implemented single-global-outstanding limitation and retained explicit pre-layout / timing-cone claim boundaries.
+- No generated XSim/DC artifacts, PDK files, board files, or external accelerator sources were added.
+
+## 2026-08-23 +08:00
+
 ### JALR forwarding 时序闭环
 
 - 将 JALR base operand 从直接 EX forwarding feedback 改为 MEM/WB late forwarding 或寄存器堆，并在 EX ALU → JALR RAW 时插入一个显式 bubble；普通 ALU/branch 的 EX forwarding 不变。
