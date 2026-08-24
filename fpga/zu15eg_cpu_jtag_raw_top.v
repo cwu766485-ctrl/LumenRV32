@@ -18,7 +18,10 @@ module zu15eg_cpu_jtag_raw_top (
     wire clk_200m;
     wire cpu_clk;
     reg [15:0] reset_count = 16'h0000;
-    wire rst_n = &reset_count;
+    // Keep reset release registered so it can safely feed the per-domain
+    // reset synchronizers in jtag_top.
+    reg reset_released = 1'b0;
+    wire rst_n = reset_released;
     wire halted;
     (* KEEP = "TRUE" *) wire over;
     (* KEEP = "TRUE" *) wire succ;
@@ -31,8 +34,12 @@ module zu15eg_cpu_jtag_raw_top (
     ) u_clk_div (.I(clk_200m), .CE(1'b1), .CLR(1'b0), .O(cpu_clk));
 
     always @(posedge cpu_clk) begin
-        if (!rst_n)
-            reset_count <= reset_count + 1'b1;
+        if (!reset_released) begin
+            if (&reset_count)
+                reset_released <= 1'b1;
+            else
+                reset_count <= reset_count + 1'b1;
+        end
     end
 
     (* KEEP_HIERARCHY = "yes" *) cpu_axi_debug_profile_top u_profile (
