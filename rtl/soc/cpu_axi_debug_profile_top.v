@@ -4,7 +4,9 @@
 // It keeps the RV32IM core (including I/D cache), CPU instruction/data AXI
 // adapters, AXI fabric, ROM/RAM, PMU and JTAG/debug. DMA and normal board
 // peripherals are removed with SOC_CPU_AXI_DEBUG_PROFILE.
-module cpu_axi_debug_profile_top (
+module cpu_axi_debug_profile_top #(
+    parameter USE_BSCAN_USER2 = 1'b0
+)(
     input wire clk,
     input wire rst,
     input wire jtag_TCK,
@@ -24,7 +26,9 @@ module cpu_axi_debug_profile_top (
     wire qspi_cs_n_unused;
     wire qspi_clk_unused;
 
-    heterogeneous_soc_top u_soc (
+    heterogeneous_soc_top #(
+        .USE_BSCAN_USER2(USE_BSCAN_USER2)
+    ) u_soc (
         .clk(clk),
         .rst(rst),
         .over(over),

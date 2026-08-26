@@ -55,7 +55,8 @@ module jtag_dm #(
 
     dm_op_req_o,
     dm_halt_req_o,
-    dm_reset_req_o
+    dm_reset_req_o,
+    dm_resp_idle_o
 
     );
 
@@ -83,6 +84,9 @@ module jtag_dm #(
     output wire dm_op_req_o;
     output wire dm_halt_req_o;
     output wire dm_reset_req_o;
+    // CPU-domain indication that the one-entry DMI response sender has
+    // completed its entire four-phase transaction.
+    output wire dm_resp_idle_o;
 
     // DM????????
     reg[31:0] dcsr;
@@ -120,13 +124,26 @@ module jtag_dm #(
     reg[31:0] dm_mem_wdata;
     reg dm_halt_req;
     reg dm_reset_req;
-    reg need_resp;
+    // One-entry response buffer.  The request and response CDCs are
+    // independent; retaining a completed response here prevents a request
+    // arriving just after the previous response was captured from being lost
+    // while the CPU-domain transmitter is still returning to idle.
+    reg resp_pending;
+    reg[DMI_ADDR_BITS-1:0] resp_addr;
+    reg[DMI_DATA_BITS-1:0] resp_read_data;
     reg is_read_reg;
     wire rx_valid;
     wire[DTM_REQ_BITS-1:0] rx_data;
 
     wire[31:0] sbaddress0_next = sbaddress0 + 4;
     wire[DM_RESP_BITS-1:0] dm_resp_data;
+    // DMSTATUS reflects the live debug-halt request.  The compact debug
+    // implementation has no separate hart-halted acknowledgement channel,
+    // therefore these all/any halted/running bits must not depend on a stale
+    // software-visible mirror register.
+    wire[31:0] dmstatus_live = {dmstatus[31:12],
+                                 dm_halt_req ? 4'h3 : 4'hc,
+                                 dmstatus[7:0]};
 
     wire[DMI_OP_BITS-1:0] op = rx_data[DMI_OP_BITS-1:0];
     wire[DMI_DATA_BITS-1:0] data = rx_data[DMI_DATA_BITS+DMI_OP_BITS-1:DMI_OP_BITS];
@@ -156,38 +173,55 @@ module jtag_dm #(
             dmstatus <= 32'h430c82;
             is_read_reg <= 1'b0;
             read_data <= 32'h0;
-            need_resp <= 1'b0;
+            resp_pending <= 1'b0;
+            resp_addr <= {DMI_ADDR_BITS{1'b0}};
+            resp_read_data <= {DMI_DATA_BITS{1'b0}};
         end else begin
+            // full_handshake_tx samples resp_pending while it is idle, then
+            // holds resp_addr/resp_read_data internally for the full CDC
+            // transfer. Clear this slot only after that sampling edge.
+            if (resp_pending && tx_idle)
+                resp_pending <= 1'b0;
             if (rx_valid) begin
-                need_resp <= 1'b1;
+                resp_pending <= 1'b1;
+                resp_addr <= address;
+                resp_read_data <= {DMI_DATA_BITS{1'b0}};
                 case (op)
                     `DTM_OP_READ: begin
                         case (address)
                             DMSTATUS: begin
-                                read_data <= dmstatus;
+                                read_data <= dmstatus_live;
+                                resp_read_data <= dmstatus_live;
                             end
                             DMCONTROL: begin
                                 read_data <= dmcontrol;
+                                resp_read_data <= dmcontrol;
                             end
                             HARTINFO: begin
                                 read_data <= hartinfo;
+                                resp_read_data <= hartinfo;
                             end
                             SBCS: begin
                                 read_data <= sbcs;
+                                resp_read_data <= sbcs;
                             end
                             ABSTRACTCS: begin
                                 read_data <= abstractcs;
+                                resp_read_data <= abstractcs;
                             end
                             DATA0: begin
                                 if (is_read_reg == 1'b1) begin
                                     read_data <= dm_reg_rdata_i;
+                                    resp_read_data <= dm_reg_rdata_i;
                                 end else begin
                                     read_data <= data0;
+                                    resp_read_data <= data0;
                                 end
                                 is_read_reg <= 1'b0;
                             end
                             SBDATA0: begin
                                 read_data <= dm_mem_rdata_i;
+                                resp_read_data <= dm_mem_rdata_i;
                                 if (sbcs[16] == 1'b1) begin
                                     sbaddress0 <= sbaddress0_next;
                                 end
@@ -294,7 +328,6 @@ module jtag_dm #(
                     end
                 endcase
             end else begin
-                need_resp <= 1'b0;
                 dm_mem_we <= 1'b0;
                 dm_reg_we <= 1'b0;
                 dm_reset_req <= 1'b0;
@@ -309,11 +342,12 @@ module jtag_dm #(
     assign dm_mem_addr_o = dm_mem_addr;
     assign dm_mem_wdata_o = dm_mem_wdata;
 
-    assign dm_op_req_o = (rx_valid & (~read_dmstatus)) | need_resp;
+    assign dm_op_req_o = (rx_valid & (~read_dmstatus)) | resp_pending;
     assign dm_halt_req_o = dm_halt_req;
     assign dm_reset_req_o = dm_reset_req;
+    assign dm_resp_idle_o = tx_idle;
 
-    assign dm_resp_data = {address, read_data, OP_SUCC};
+    assign dm_resp_data = {resp_addr, resp_read_data, OP_SUCC};
 
 
     full_handshake_tx #(
@@ -322,7 +356,7 @@ module jtag_dm #(
         .clk(clk),
         .rst_n(rst_n),
         .ack_i(dtm_ack_i),
-        .req_i(need_resp),
+        .req_i(resp_pending),
         .req_data_i(dm_resp_data),
         .idle_o(tx_idle),
         .req_o(dm_resp_valid_o),

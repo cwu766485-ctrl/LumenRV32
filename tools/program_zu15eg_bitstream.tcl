@@ -19,10 +19,12 @@ foreach target [get_hw_targets] {
     foreach device [get_hw_devices] {
         if {[string match "xczu15*" [get_property PART $device]]} {
             current_hw_device $device
-            refresh_hw_device -update_hw_probes false $device
+            # An unconfigured ZU device can block indefinitely in an explicit
+            # pre-program refresh. PROGRAM.FILE/program_hw_devices does not
+            # require a pre-refresh, so assign the image directly and leave
+            # the optional state refresh to a subsequent read-only probe.
             set_property PROGRAM.FILE $bitstream $device
             program_hw_devices $device
-            refresh_hw_device -update_hw_probes false $device
             puts "ZU15EG_PROGRAMMED device=$device bitstream=$bitstream"
             set programmed 1
             break

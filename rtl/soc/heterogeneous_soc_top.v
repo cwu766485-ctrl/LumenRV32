@@ -25,7 +25,9 @@ limitations under the License.
 // The public edition intentionally omits the unlicensed accelerator RTL.
 // Keep the legacy control/master slot quiescent so the CPU/DMA SoC remains
 // source-compatible with its existing memory-map and testbench boundary.
-module heterogeneous_soc_top(
+module heterogeneous_soc_top #(
+    parameter USE_BSCAN_USER2 = 1'b0
+)(
 
     input wire clk,
     input wire rst,
@@ -431,6 +433,8 @@ module heterogeneous_soc_top(
     // jtag
     wire jtag_halt_req_o;
     wire jtag_reset_req_o;
+    wire bscan_jtag_halt_req_o;
+    wire bscan_jtag_reset_req_o;
     // JTAG DM is a control-plane source.  Do not feed its raw request directly
     // into the CPU's combinational hold/flush network: debug memory reads use
     // the shared data path and otherwise create a JTAG -> frontend/cache ->
@@ -442,6 +446,23 @@ module heterogeneous_soc_top(
     wire[`RegBus] jtag_reg_data_o;
     wire jtag_reg_we_o;
     wire[`RegBus] jtag_reg_data_i;
+    wire[`RegAddrBus] bscan_jtag_reg_addr_o;
+    wire[`RegBus] bscan_jtag_reg_data_o;
+    wire bscan_jtag_reg_we_o;
+    wire bscan_jtag_mem_we;
+    wire[`MemAddrBus] bscan_jtag_mem_addr;
+    wire[`MemBus] bscan_jtag_mem_wdata;
+    wire bscan_jtag_mem_req;
+    wire[`MemBus] bscan_jtag_mem_rdata;
+    wire jtag_halt_req = USE_BSCAN_USER2 ? bscan_jtag_halt_req_o : jtag_halt_req_o;
+    wire jtag_reset_req = USE_BSCAN_USER2 ? bscan_jtag_reset_req_o : jtag_reset_req_o;
+    wire[`RegAddrBus] jtag_reg_addr = USE_BSCAN_USER2 ? bscan_jtag_reg_addr_o : jtag_reg_addr_o;
+    wire[`RegBus] jtag_reg_data = USE_BSCAN_USER2 ? bscan_jtag_reg_data_o : jtag_reg_data_o;
+    wire jtag_reg_we = USE_BSCAN_USER2 ? bscan_jtag_reg_we_o : jtag_reg_we_o;
+    wire jtag_mem_we_selected = USE_BSCAN_USER2 ? bscan_jtag_mem_we : jtag_mem_we;
+    wire[`MemAddrBus] jtag_mem_addr_selected = USE_BSCAN_USER2 ? bscan_jtag_mem_addr : jtag_mem_addr;
+    wire[`MemBus] jtag_mem_wdata_selected = USE_BSCAN_USER2 ? bscan_jtag_mem_wdata : jtag_mem_wdata;
+    wire jtag_mem_req_selected = USE_BSCAN_USER2 ? bscan_jtag_mem_req : jtag_mem_req;
 
     // RISC-V CPU core
     wire[`INT_BUS] int_flag;
@@ -497,14 +518,15 @@ module heterogeneous_soc_top(
     assign m1_data_i = `ZeroWord;
     assign m1_wmask_i = 4'b1111;
     assign m1_we_i = `WriteDisable;
-    assign m2_addr_i = (jtag_mem_req == `True) ? jtag_mem_addr : dma_addr;
-    assign m2_data_i = (jtag_mem_req == `True) ? jtag_mem_wdata : dma_wdata;
-    assign m2_wmask_i = (jtag_mem_req == `True) ? 4'hf : dma_wmask;
-    assign m2_req_i = (jtag_mem_req == `True) ? jtag_mem_req : dma_req;
-    assign m2_we_i = (jtag_mem_req == `True) ? jtag_mem_we : dma_we;
+    assign m2_addr_i = (jtag_mem_req_selected == `True) ? jtag_mem_addr_selected : dma_addr;
+    assign m2_data_i = (jtag_mem_req_selected == `True) ? jtag_mem_wdata_selected : dma_wdata;
+    assign m2_wmask_i = (jtag_mem_req_selected == `True) ? 4'hf : dma_wmask;
+    assign m2_req_i = (jtag_mem_req_selected == `True) ? jtag_mem_req_selected : dma_req;
+    assign m2_we_i = (jtag_mem_req_selected == `True) ? jtag_mem_we_selected : dma_we;
     assign jtag_mem_rdata = m2_data_o;
+    assign bscan_jtag_mem_rdata = m2_data_o;
     assign dma_rdata = m2_data_o;
-    assign dma_ready = (jtag_mem_req == `True) ? `False : m2_ready_o;
+    assign dma_ready = (jtag_mem_req_selected == `True) ? `False : m2_ready_o;
     assign apb_legacy_dma_rdata = `ZeroWord;
     assign apb_legacy_dma_ready = `True;
     assign m3_addr_i = uart_dbg_addr;
@@ -577,8 +599,8 @@ module heterogeneous_soc_top(
             over <= ~u_riscv_cpu.u_regs.regs[26];
             succ <= ~u_riscv_cpu.u_regs.regs[27];
 `endif
-            jtag_halt_req_r <= jtag_halt_req_o;
-            jtag_reset_req_r <= jtag_reset_req_o;
+            jtag_halt_req_r <= jtag_halt_req;
+            jtag_reset_req_r <= jtag_reset_req;
         end
     end
 
@@ -598,9 +620,9 @@ module heterogeneous_soc_top(
         .mem_pc_req_o(m1_req_i),
         .mem_pc_burst_len_o(m1_burst_len_i),
         .mem_pc_ready_i(m1_ready_o),
-        .jtag_reg_addr_i(jtag_reg_addr_o),
-        .jtag_reg_data_i(jtag_reg_data_o),
-        .jtag_reg_we_i(jtag_reg_we_o),
+        .jtag_reg_addr_i(jtag_reg_addr),
+        .jtag_reg_data_i(jtag_reg_data),
+        .jtag_reg_we_i(jtag_reg_we),
         .jtag_reg_data_o(jtag_reg_data_i),
         .jtag_halt_flag_i(jtag_halt_req_r),
         .jtag_reset_flag_i(jtag_reset_req_r),
@@ -1126,5 +1148,29 @@ module heterogeneous_soc_top(
         .halt_req_o(jtag_halt_req_o),
         .reset_req_o(jtag_reset_req_o)
     );
+
+    generate
+        if (USE_BSCAN_USER2) begin : g_bscan_user2
+            jtag_bscan2_user2 u_jtag_bscan2_user2(
+                .clk(clk), .arst_n(rst),
+                .reg_we_o(bscan_jtag_reg_we_o), .reg_addr_o(bscan_jtag_reg_addr_o),
+                .reg_wdata_o(bscan_jtag_reg_data_o), .reg_rdata_i(jtag_reg_data_i),
+                .mem_we_o(bscan_jtag_mem_we), .mem_addr_o(bscan_jtag_mem_addr),
+                .mem_wdata_o(bscan_jtag_mem_wdata), .mem_rdata_i(bscan_jtag_mem_rdata),
+                .op_req_o(bscan_jtag_mem_req), .halt_req_o(bscan_jtag_halt_req_o),
+                .reset_req_o(bscan_jtag_reset_req_o)
+            );
+        end else begin : g_no_bscan_user2
+            assign bscan_jtag_reg_we_o = 1'b0;
+            assign bscan_jtag_reg_addr_o = `ZeroReg;
+            assign bscan_jtag_reg_data_o = `ZeroWord;
+            assign bscan_jtag_mem_we = 1'b0;
+            assign bscan_jtag_mem_addr = `ZeroWord;
+            assign bscan_jtag_mem_wdata = `ZeroWord;
+            assign bscan_jtag_mem_req = 1'b0;
+            assign bscan_jtag_halt_req_o = 1'b0;
+            assign bscan_jtag_reset_req_o = 1'b0;
+        end
+    endgenerate
 
 endmodule

@@ -99,6 +99,11 @@ module jtag_driver #(
     reg[3:0] jtag_state;
     wire is_busy;
     reg sticky_busy;
+    // A DMI UPDATE_DR is legal only after this TAP has captured the DMI data
+    // register.  This is also important when the transport is driven below a
+    // vendor user-scan TAP: an UPDATE belonging to instruction selection must
+    // never be reinterpreted as a DMI submission.
+    reg dmi_capture_seen;
     reg dtm_req_valid;
     reg[DTM_REQ_BITS - 1:0] dtm_req_data;
     reg[DM_RESP_BITS - 1:0] dm_resp_data;
@@ -190,15 +195,20 @@ module jtag_driver #(
         if (!rst_n) begin
             dtm_req_valid <= `DTM_REQ_INVALID;
             dtm_req_data <= {DTM_REQ_BITS{1'b0}};
+            dmi_capture_seen <= 1'b0;
         end else begin
+            if ((jtag_state == CAPTURE_DR) && (ir_reg == REG_DMI)) begin
+                dmi_capture_seen <= 1'b1;
+            end
             if (jtag_state == UPDATE_DR) begin
-                if (ir_reg == REG_DMI) begin
+                if ((ir_reg == REG_DMI) && dmi_capture_seen) begin
                     // if DM can be access
                     if (!is_busy & tx_idle) begin
                         dtm_req_valid <= `DTM_REQ_VALID;
                         dtm_req_data <= shift_reg;
                     end
                 end
+                dmi_capture_seen <= 1'b0;
             end else begin
                 dtm_req_valid <= `DTM_REQ_INVALID;
             end

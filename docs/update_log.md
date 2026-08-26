@@ -1,5 +1,35 @@
 # 项目更新日志
 
+## 2026-08-25 +08:00
+
+### ZU15EG USER2 DMI 板级最终验收
+
+- 以 bitstream SHA-256 `36CC8A3DD3BB3A92664E21D6953BA314D1D1230FA9AFC216F481BA00189C6BAA` 易失下载至 `xczu15` 后，真实板测完成并通过：`DMSTATUS=0x00430C82`（running）→ `DMCONTROL halt=0x80010001` → `DMSTATUS=0x00430382`（halted）→ abstract 只读 `x5=0x00000000` → `DMCONTROL resume=0x40010001` → `DMSTATUS=0x00430C82`（running），host 输出 `USER2_HALT_GPR_READ_RESUME_PASS`。
+- host client 发现 XSDB sequence object 边界可能恢复外层 TAP instruction；每笔独立请求前需重新选择 ZynqMP USER2 instruction `0x903`，或将完整验收保持在单一连续 USER2 session。最终 `full` 模式采用后一方式，且提前排入 resume，避免中途响应解析异常使 CPU 停留在 halt。
+- 新版 DMI response path 使用一项保持式 response buffer，不再用单周期 `need_resp` 脉冲；`DMSTATUS` 的 all/any halted/running 状态直接反映 live `dm_halt_req`，并已有 USER2 专项仿真断言覆盖。
+- 最终实现结果：`xczu15eg-ffvb1156-2-i`、`FPGA_CPU_CLK_DIV=2`（100 MHz），`ZU15EG_CPU_JTAG_USER2_BUILD=PASS`；本轮板测不发送 CPU reset、DMI memory/system-bus write 或 Flash 操作。
+
+### USER2 DMI host-response closeout correction
+- Board-side XSDB analysis confirmed that a USER2 `CAPTURE -> UPDATE` NOP scan was being accepted as a new DMI transaction. `jtag_user2_dmi_transport` now treats `op=NOP` as a response-capture-only scan and does not submit it across the TCK/CPU CDC; the USER2 transport TB now asserts that this NOP does not raise a second debug operation.
+- The host client returned to the standard request scan followed by NOP response-capture scans. The alternate DRPAUSE-only proposal was discarded after board evidence: re-entering `DRSHIFT` from `DRPAUSE` does not traverse `CAPTURE_DR`, so it cannot sample a newly arrived asynchronous DMI response.
+- A subsequent board run exposed the next single-outstanding corner: accepting a new request as soon as its response reaches TCK can overlap the prior response sender's ack-low phase and lose the second response. The transport now keeps `dm_busy` asserted until that response handshake is fully released; the host adds two ignored-NOP settle scans after a matched response, and the TB checks the transport-idle boundary before a back-to-back halt request.
+- Board read-after-read evidence showed that the prior release point was still two CPU-domain synchronizer cycles early: `jtag_dm`'s one-entry response `full_handshake_tx` had not yet returned to `tx_idle`. `jtag_dm` now exports this CPU-domain idle state; USER2 synchronizes it into TCK and releases the next DMI request only after the return ACK is low and the sender is idle. The initial "must observe busy then idle" refinement was removed because its synchronized low pulse can be missed and would hold the single-outstanding gate forever.
+- Final board read-after-read diagnosis identified the structural root cause: `jtag_dm` emitted a response with a one-cycle `need_resp` pulse, so a second request received while its response sender was still returning to idle could lose its response. Replaced that pulse with a one-entry response buffer holding the tagged address and data until `full_handshake_tx` samples it. USER2 releases the next request after the TCK-side response ACK is low; the buffer preserves the response safely during the CPU-side sender tail.
+- Board evidence then confirmed that `DMCONTROL=0x80010001` was accepted while `DMSTATUS` still returned its old running mirror. `DMSTATUS` all/any halted/running bits now derive directly from the live `dm_halt_req`; this compact DM has no distinct hart-halted acknowledgement input. USER2 TB now requires `DMSTATUS=0x00430382` after halt before issuing the abstract GPR read.
+
+### JTAG USER2 transport 收口（RTL/仿真）
+
+- 新增 `BSCANE2` `JTAG_CHAIN=2`（USER2）封装和独立 `jtag_user2_dmi_transport`，可经 ZU15EG 既有配置 JTAG 链路接入 DMI，无需额外 FMC/PMOD 四线 JTAG 引脚。
+- transport 仅在同一 USER2 事务出现 `CAPTURE` 后接受 `UPDATE`；无 `CAPTURE` 的 `UPDATE` 不得提交 DMI，避免外层 TAP 指令选择阶段污染 payload。
+- 新增 USER2 端到端 TB 和 XSim 启动脚本，实际通过 `JTAG_USER2_TRANSPORT_TB_PASS`：覆盖 capture-less update 拒绝、只读 DMSTATUS、halt、abstract GPR read、resume；测试不发起 reset、DMI memory write 或 Flash 操作。
+- 重新执行异步 DMI CDC TB，得到 `JTAG_DMI_CDC_TB_PASS`。
+- 新增 ZU15EG USER2 CPU-focused build top/脚本；在 `xczu15eg-ffvb1156-2-i`、`FPGA_CPU_CLK_DIV=2`（100 MHz）完成 post-route 和 bitstream：WNS `+1.711 ns`、TNS `0`、WHS `+0.004 ns`、THS `0`；`20,593` LUT、`16,006` registers、`16` BRAM tiles、`4` DSP。bitstream SHA-256：`670463E784BCEBB18051A025B85D2B506DB910E06D8F0A9BA980D07DCA00FE40`。
+- 板级最终验收仍未完成：仓库当前没有 host-side USER2 scan client，USER3 trace 也尚未实现；不得将 RTL/仿真/实现 PASS 写为板测 PASS。
+- 板级下载排障发现未配置 `xczu15` 在下载前 `refresh_hw_device` 停滞；下载脚本改为直接设置 `PROGRAM.FILE` 后调用 `program_hw_devices`，配置完成状态由后续只读 probe 确认。
+- 新增基于 XSDB raw `jtag sequence` 的 USER2 DMI host client。`dmstatus` 模式仅发起只读 DMSTATUS；`full` 模式限定为 `DMSTATUS → halt → abstract x5 read → resume`，不实现 reset、system-bus/memory write 或 Flash 操作。
+- 板测 client 排障确认 `xczu15` 的 USER2 为 ZynqMP 12-bit instruction `0x903`，而不是通用 FPGA USER2 值 `0x003`；依据本机 Vitis `svf.tcl` 的 ZynqMP USER instruction 编码规则修正 host client。此前仅执行的错误 instruction scan 未触发 DMI 控制操作。
+- 板测 DMSTATUS 已返回 `0x00430C82`，验证 USER2/DMI transport 可用。首次 halt 尝试确认 host client 在每笔 transaction 前进入 TAP RESET 会复位 `BSCANE2` transport/`jtag_dm`，使后续读取回到默认 running 状态；client 改为仅在会话初始化时 RESET/选择 USER2，后续 DMI 事务保持 USER2，不在操作之间 RESET。
+
 ## 2026-08-24 +08:00
 
 ### ZU15EG external raw-JTAG profile

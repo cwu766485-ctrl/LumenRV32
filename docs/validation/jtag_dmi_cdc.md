@@ -34,6 +34,35 @@ Fresh result on 2026-08-23: `JTAG_DMI_CDC_TB_PASS`. The complete `simple` SoC sm
 
 `fpga/zu15eg_cpu_jtag_raw_top.v` is the board wrapper for a raw four-wire PL JTAG connection. It exposes `jtag_TCK/TMS/TDI/TDO` and reuses the hardened DMI CDC. `tools/build_zu15eg_cpu_jtag_raw.ps1` requires `-JtagXdc`, a real FMC/PMOD/GPIO pin and I/O-standard mapping; the repository intentionally provides only a pin-free example.
 
+For the existing ZU15EG configuration cable, `fpga/zu15eg_cpu_jtag_user2_top.v`
+uses the device-supported `BSCANE2` primitive with `JTAG_CHAIN=2` (USER2),
+so no additional PL pin mapping is required. Its independent
+`jtag_user2_dmi_transport` has a transport guard: an `UPDATE` submits a DMI
+bundle only if a matching USER2 `CAPTURE` occurred first. This prevents an
+outer TAP instruction-selection update from being treated as a DMI request.
+
+The directed USER2 transport test runs a capture-less-update rejection,
+DMSTATUS read, halt, abstract GPR read, and resume sequence:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\run_jtag_user2_transport_tb.ps1
+```
+
 The profile base XDC constrains external TCK initially at 50 MHz and declares it asynchronous to `PL_REFCLK_200M` and derived CPU clocks. The data bundle must not be blanket false-pathed; after synthesis, a flow may add datapath-only/max-delay checks using actual register instance names.
 
-This work is RTL hardening with asynchronous-clock simulation evidence. It is not static CDC sign-off, active-TCK FPGA post-route closure, or board-level JTAG acceptance. The board USB-JTAG configuration chain cannot be wired directly to this raw TAP; using that path requires a separate BSCANE3 user-scan adapter.
+Fresh board acceptance on 2026-08-26 used the ZU15EG configuration cable,
+ZynqMP USER2 instruction `0x903`, and the USER2 host client:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\run_zu15eg_user2_dmi.ps1 -Mode full
+```
+
+The observed sequence passed: `DMSTATUS=0x00430C82` (running) → halt →
+`DMSTATUS=0x00430382` (halted) → abstract read `x5=0x00000000` → resume →
+`DMSTATUS=0x00430C82` (running), with `USER2_HALT_GPR_READ_RESUME_PASS`.
+The board image was the 100 MHz USER2 profile with SHA-256
+`36CC8A3DD3BB3A92664E21D6953BA314D1D1230FA9AFC216F481BA00189C6BAA`.
+
+This is board evidence for this limited debug sequence, not static CDC
+sign-off or a claim of a full RISC-V Debug Specification implementation.
+USER3 trace is not implemented and must not be claimed as available.
