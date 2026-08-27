@@ -1,5 +1,32 @@
 # 项目更新日志
 
+## 2026-08-26 +08:00
+
+### CPU 面试边界 DV 入口与静态检查准备
+
+- 新增 `docs/validation/cpu_dv_plan.md`：以 JTAG/DMI CDC、USER2 transport、JALR forwarding、branch predictor、D-Cache store path 和 CPU AXI RAM path 作为可解释的 CPU DV 最小范围；明确 coverage plan、回归规则和未完成边界。
+- 新增 `tools/run_cpu_interview_regression.ps1`，以串行方式调用上述专项 TB，避免共享 XSim 工作目录并发污染。本轮新鲜运行已观察到 `JTAG_DMI_CDC_TB_PASS`、`JTAG_USER2_TRANSPORT_TB_PASS`、`ID_JALR_FORWARDING_TB_PASS`、`BRANCH_PREDICTOR_TB_PASS`、`DCACHE_STORE_PATH_TB_PASS` 与 `AXI4_CPU_RAM_PATH_PASS`。
+- 新增 `tools/spyglass/` 的 CPU-profile 静态检查入口与 CPU/JTAG 时钟意图。Rocky-8.10 当前 shell 未加载 `spyglass`，所以 CDC/RDC/Lint 尚未运行；不得标记为 sign-off PASS。
+- `run_isa_regression.ps1` 仍被 RISC-V GCC 与 `tests/isa/generated` 工件缺失阻塞，明确记为 `BLOCKED`。
+
+### SpyGlass Lint 首轮执行与 JTAG 声明修复
+
+- 在 Rocky-8.10 的交互 shell 中确认 `SpyGlass V-2023.12-SP1` 可用；此前非交互 shell 不读取 `~/.bashrc`，因此错误地表现为 `spyglass` 不在 `PATH`。
+- 新增 CPU-profile SpyGlass source/include 生成、SystemVerilog 解析和 `lint/lint_rtl` 目标适配。首轮完整 Lint 已执行，不是 sign-off PASS：`22 errors / 400 warnings`。
+- Lint 发现 `jtag_dm.v` 中 `tx_idle` 依赖 Verilog implicit net；已改为显式 `wire tx_idle`，随后 `JTAG_USER2_TRANSPORT_TB_PASS` 重新通过。
+- 当前错误需分类处理：大容量 cache/RAM/memory-model 超出默认 `mthresh`、debug 层次寄存器访问不适合静态综合分析、以及 `s2_req_o` 未驱动提示。不得将这些误写为 CDC/RDC/Lint clean；下一轮先完善工具参数，再逐条审查 RTL 或建立有理由的 waiver。
+
+### RISC-V CPU core SpyGlass Lint baseline
+
+- 新增 `tools/spyglass/run_riscv_core_lint.sh`。该 profile 以 `riscv_cpu_core` 为 top，保留真实 I/D Cache RTL，并排除 SoC RAM/ROM/DDR memory model 与板级 primitive，避免仿真数组和 board IP 干扰 CPU 核 static analysis。
+- 使用 SpyGlass `V-2023.12-SP1` 运行 `lint/lint_rtl`：Design Read、Blackbox Resolution、SGDC Checks 和 Policy lint 均为 `0 error`；报告有 `58 warnings / 4 infos`。这是 CPU core 的 Lint baseline，不等价于 warning 全部 waiver 或完整 SoC/CDC/RDC sign-off。
+
+### 公开版 provenance 与 AXI 事实校正
+
+- 复核 Apache-2.0 上游归属：保留 `LICENSE`、`NOTICE` 和继承 RTL 中 Blue Liang/TinyRISCV 的版权头；README 明确上游作者为 attribution，不表示其为本仓库 collaborator 或 endorsement。
+- 修正 `NOTICE` 和 `axi4_crossbar.v` 的过时 “ID-aware response routing / Stage B/C” 描述。当前公开实现为单个全局 outstanding transaction，不支持 AXI ID、multi-outstanding 或 OoO response。
+- 本轮改动的 `jtag_dm.v` 与 `heterogeneous_soc_top.v` 保留上游版权头并增加 LumenRV32 modifications notice，满足派生源文件对修改声明和归属保留的要求。
+
 ## 2026-08-25 +08:00
 
 ### ZU15EG USER2 DMI 板级最终验收

@@ -1,11 +1,11 @@
 `timescale 1 ns / 1 ps
 `include "../core/defines.v"
 
-// Four-master/four-slave AXI4 crossbar, ID-aware Stage B/C implementation.
-// Outgoing ID[3:0] = {master_index[1:0], 1'b0, local_id[0]}.  The master
-// prefix gives every initiator an independent ID namespace.  Write data is
-// serialized in AW acceptance order per slave (AXI4 has no WID); AR requests
-// may be issued independently and R/B return through their decoded IDs.
+// Four-master/four-slave packed-channel AXI4 crossbar.
+// The public CPU profile is qualified only for one global outstanding
+// transaction.  The packed ID and queue structures below are experimental
+// integration work; they are not evidence of qualified AXI ID routing,
+// multi-outstanding traffic, or out-of-order response handling.
 module axi4_crossbar(
     input wire clk, input wire rst,
     input wire[3:0] s_axi_awid, input wire[127:0] s_axi_awaddr, input wire[31:0] s_axi_awlen,

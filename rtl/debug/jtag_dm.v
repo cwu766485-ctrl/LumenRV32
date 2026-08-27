@@ -2,6 +2,9 @@
 
  /*                                                                      
  Copyright 2020 Blue Liang, liangkangnan@163.com
+
+ Modifications Copyright 2026 LumenRV32 contributors
+ Modified for USER2 DMI transport, response buffering and CDC integration.
                                                                          
  Licensed under the Apache License, Version 2.0 (the "License");         
  you may not use this file except in compliance with the License.        
@@ -132,6 +135,9 @@ module jtag_dm #(
     reg[DMI_ADDR_BITS-1:0] resp_addr;
     reg[DMI_DATA_BITS-1:0] resp_read_data;
     reg is_read_reg;
+    // Explicit declaration is required for strict lint; this is driven by
+    // the response-channel full_handshake_tx instance below.
+    wire tx_idle;
     wire rx_valid;
     wire[DTM_REQ_BITS-1:0] rx_data;
 

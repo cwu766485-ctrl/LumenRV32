@@ -1,6 +1,9 @@
 /*
 Copyright 2020 Blue Liang, liangkangnan@163.com
 
+Modifications Copyright 2026 LumenRV32 contributors
+Modified for CPU profile integration, AXI/APB integration and debug paths.
+
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
@@ -541,6 +544,9 @@ module heterogeneous_soc_top #(
     assign s4_ready_i = `True;
     assign s5_ready_i = `True;
     assign s6_ready_i = `True;
+    // Slave slot 2 is the public profile's reserved accelerator window.  No
+    // accelerator is instantiated, so its select request must be explicit.
+    assign s2_req_o = `False;
     assign s2_sel_o = s2_req_o;
     assign perf_fetch_bus_wait = m1_req_i && !m1_ready_o;
     assign perf_data_bus_wait = m0_req_i && !m0_ready_o;

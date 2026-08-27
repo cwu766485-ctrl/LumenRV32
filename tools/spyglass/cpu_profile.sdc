@@ -1,0 +1,4 @@
+# CPU profile clock intent for static CDC/RDC/Lint setup.
+create_clock -name cpu_clk -period 10.000 [get_ports clk]
+create_clock -name jtag_tck -period 20.000 [get_ports jtag_TCK]
+set_clock_groups -asynchronous -group {cpu_clk} -group {jtag_tck}

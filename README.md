@@ -57,4 +57,7 @@ separate acceptance step.
 
 ## Attribution
 
-This repository retains required upstream Apache-2.0 notices in `LICENSE` and `NOTICE`. Do not remove third-party attribution from inherited files.
+LumenRV32 is derived in part from [TinyRISCV by Blue Liang](https://github.com/liangkangnan/tinyriscv), released under Apache-2.0. Upstream copyright and attribution notices are retained in inherited source files; this repository's CPU, cache, interconnect, debug, verification, and implementation work includes substantial subsequent modifications. See [`NOTICE`](NOTICE) for provenance and [`LICENSE`](LICENSE) for redistribution terms.
+
+Blue Liang is credited as an upstream author, not represented as a collaborator
+or endorser of this repository.

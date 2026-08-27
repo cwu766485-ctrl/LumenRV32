@@ -10,9 +10,9 @@ Relevant upstream copyright and license notices are retained in derived source
 files.
 
 This repository contains substantial modifications and additions, including a
-five-stage CPU pipeline, I-Cache and D-Cache, DMA, PMU, AXI4/AXI-Lite/APB
-interconnect, constrained ID-aware response routing, QSPI, external-memory and
-DDR integration, FPGA/ASIC implementation flows, tests, and documentation.
+five-stage CPU pipeline, I-Cache and D-Cache, DMA, PMU, a single-global-
+outstanding AXI4 crossbar, AXI4-Lite/APB control paths, QSPI and external-memory
+integration, FPGA/ASIC implementation flows, tests, and documentation.
 
 Files with separate copyright notices remain subject to those notices and their
 associated licenses.
