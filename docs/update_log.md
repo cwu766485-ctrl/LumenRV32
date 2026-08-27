@@ -1,5 +1,31 @@
 # 项目更新日志
 
+## 2026-08-27 +08:00
+
+### Pipeline hazard UVM 定向回归
+- 新增 `pipeline_hazard_test`，在独立受控程序中覆盖 EX/MEM/WB forwarding、load-use interlock、JAL/JALR redirect；scoreboard 检查 x1/x2/x3/x5/x7/x8/x9/x11、data-memory signature、`Hold_Load` 和 redirect 事件。
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run_cpu_uvm_smoke.ps1 -TestName pipeline_hazard_test -Snapshot cpu_uvm_pipeline_hazard` 新鲜 PASS：`CPU_UVM_PIPELINE_HAZARD_SCOREBOARD_PASS hold_load=2 redirect=92 data=12` 与 `CPU_UVM_PIPELINE_HAZARD_PASS`，UVM `0 error / 0 fatal`。
+- `bash tools/run_cpu_uvm_smoke.sh pipeline_hazard_test` 在 Rocky-8.10 / VCS V-2023.12-SP1 新鲜 PASS，得到相同 scoreboard token 和 UVM `0 error / 0 fatal`。
+- XSim 2024.1 不接受带 `=` 的 `--testplusarg` value form，因此 testbench 使用布尔 `PIPELINE_HAZARD` harness plusarg 选择此用例；VCS 同样使用该布尔 plusarg，以保持两端运行语义一致。
+
+### 简历项目表述收口
+- 更新 `docs/RESUME.md`，将公开、可复核的 CPU RTL、cache-to-AXI 集成、UVM 定向验证、USER2 DMI 板测、28 nm DC timing-cone 和 ZU15EG post-route 证据拆分为独立 bullet；明确不将定向验证、timing cone、custom DMI 或 FPGA profile 扩大表述为 sign-off、完整 Debug Spec、完整 SoC DDR4 或 OoO AXI 能力。
+- 简历 FPGA 数字统一到最终 USER2 closeout image 的 routed report：100 MHz、WNS `+1.527 ns`、TNS `0`、WHS `+0.015 ns`、`20,587` CLB LUT、`16,006` registers、`16` BRAM tiles 与 `4` DSP；不再混用较早 CPU-only profile 的资源数字或未归档的中间 WNS。
+
+### UVM 目录分层与 Linux VCS 入口
+- 新增 `docs/validation/test_matrix.md` 作为唯一测试索引，区分 `FRESH PASS`、`RECORDED PASS`、`BLOCKED` 与 `NOT_RUN`；后续每轮只从“当前只推进的下一项”取一个小任务，避免并行扩展造成状态混乱。
+- 将 `verify/uvm_cpu/` 重构为 `agent/`、`common/`、`env/`、`formal/`、`sim/`、`tb/` 和 `tests/`；第一层只保留 `cpu_smoke_test`，后续将把 hazard、cache backpressure、JTAG halt/resume 和 interrupt 分别实现为独立 test。
+- 新增 `formal/cpu_core_properties.sv`，包含 x0 读零与 native instruction/data request 在 backpressure 期间稳定的 SVA。属性已随 XSim smoke 执行；尚未运行 formal proof，因此 formal 状态为 `NOT_RUN`。
+- 重构后重新运行 `powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run_cpu_uvm_smoke.ps1 -Snapshot cpu_core_uvm_layers`：`CPU_UVM_SCOREBOARD_PASS fetch=24 data=13 redirect=62 ic_miss=2 dc_load_miss=1 dc_store_miss=1`、`CPU_UVM_SMOKE_PASS`，UVM 为 `0 error / 0 fatal`。
+- 新增 `tools/run_cpu_uvm_smoke.sh`，使用 Linux VCS 的 UVM-1.2 package 显式编译与 DPI 链接流程；在 Rocky-8.10 + VCS `V-2023.12-SP1` 中完成新鲜 PASS：`CPU_UVM_SCOREBOARD_PASS`、`CPU_UVM_SMOKE_PASS`、`CPU_UVM_VCS_SMOKE_PASS`，UVM 为 `0 error / 0 fatal`。脚本的输出目录 `build/uvm_cpu_vcs.*` 和 VCS `AN.DB/` 已忽略。
+
+### RV32IM CPU UVM 第一层
+
+- 新增 `verify/uvm_cpu/`：以 `riscv_cpu_core` 为 DUT，定义 native instruction/data memory BFM、sequence/driver、monitor、scoreboard 与功能覆盖。
+- `cpu_smoke_test` 执行 forwarding、store/load、taken branch/flush 程序，通过 JTAG 组合读端口检查 x3/x4/x5 和 data-memory signature；运行入口为 `tools/run_cpu_uvm_smoke.ps1`。
+- 使用 Vivado 2024.1 XSim 内置 UVM-1.2 完成新鲜运行：`CPU_UVM_SCOREBOARD_PASS fetch=24 data=13 redirect=62 ic_miss=2 dc_load_miss=1 dc_store_miss=1`、`CPU_UVM_SMOKE_PASS`，UVM summary 为 `0 error / 0 fatal`。该入口已加入 CPU interview regression 的串行首项。
+- 本阶段不宣称随机 instruction generation、ISS/DPI-C differential verification 或 coverage closure；既有 JALR、branch、D-Cache 和 AXI 专项 TB 继续保留并由 CPU interview regression 串行调用。
+
 ## 2026-08-26 +08:00
 
 ### CPU 面试边界 DV 入口与静态检查准备

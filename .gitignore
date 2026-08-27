@@ -6,7 +6,12 @@
 # Vivado / simulation artifacts
 .vscode/
 .Xil/
+AN.DB/
 build/
+csrc/
+tr_db.log
+ucli.key
+vc_hdrs.h
 *.vvp
 clockInfo.txt
 vivado.jou
@@ -15,6 +20,8 @@ sim/xelab.log
 sim/xelab.pb
 sim/xsim.jou
 sim/xsim.log
+sim/tr_db.log
+sim/xsim.covdb/
 sim/xsim_*.backup.jou
 sim/xsim_*.backup.log
 sim/xsim_run_probe.log

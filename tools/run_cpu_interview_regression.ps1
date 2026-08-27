@@ -7,6 +7,8 @@ param(
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $tests = @(
+    @{ Name = 'cpu_uvm_smoke'; Script = 'run_cpu_uvm_smoke.ps1' },
+    @{ Name = 'cpu_uvm_pipeline_hazard'; Script = 'run_cpu_uvm_smoke.ps1'; TestName = 'pipeline_hazard_test'; Snapshot = 'cpu_uvm_pipeline_hazard' },
     @{ Name = 'jtag_dmi_cdc'; Script = 'run_jtag_dmi_cdc_tb.ps1' },
     @{ Name = 'jtag_user2_transport'; Script = 'run_jtag_user2_transport_tb.ps1' },
     @{ Name = 'id_jalr_forwarding'; Script = 'run_id_jalr_forwarding_tb.ps1' },
@@ -22,7 +24,10 @@ if ($IncludeIsa) {
 $passed = 0
 foreach ($test in $tests) {
     Write-Host "=== CPU_DV $($test.Name) ==="
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot $test.Script) -VivadoBin $VivadoBin
+    $invokeArgs = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot $test.Script), '-VivadoBin', $VivadoBin)
+    if ($test.ContainsKey('TestName')) { $invokeArgs += @('-TestName', $test.TestName) }
+    if ($test.ContainsKey('Snapshot')) { $invokeArgs += @('-Snapshot', $test.Snapshot) }
+    & powershell.exe @invokeArgs
     if ($LASTEXITCODE -ne 0) { throw "CPU DV regression failed: $($test.Name)" }
     $passed++
 }
