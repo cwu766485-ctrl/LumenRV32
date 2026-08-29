@@ -7,6 +7,7 @@
 .vscode/
 .Xil/
 AN.DB/
+alib-*/
 build/
 csrc/
 tr_db.log
@@ -79,3 +80,6 @@ tmp/
 
 # Local license files must never be committed
 *.lic
+
+# Personal application notes are kept locally only.
+docs/RESUME.md

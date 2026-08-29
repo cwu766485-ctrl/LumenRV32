@@ -1,5 +1,14 @@
 # 项目更新日志
 
+## 2026-08-28 +08:00
+
+### 28 nm DC 全核基线与 CoreMark 板级验收入口
+- 在真实 28 nm standard-cell max/min library、`riscv_cpu_core`、5.000 ns 时钟和 pre-layout 约束下完成 DC 全核综合；QoR 为 setup/hold `WNS=0.00 ns`、`TNS=0.00 ns`、无 timing violation。最差 setup path 为 `u_id_ex/reg2_rdata_reg[0]` 到 `u_id_ex/reg2_rdata_reg[31]`，81 logic levels、4.87 ns，说明 200 MHz 仅刚好收敛且后续优化应集中在 ID/EX operand-selection cone。
+- 本轮 `Macro Count=0`，I/D Cache 仍以行为数组综合；`467031.597320` 为 standard-cell library area units，不能当作最终含 SRAM macro 的芯片面积或 physical sign-off PPA。下一步应以匹配 PVT 的 SRAM macro wrapper 重跑同一约束，再比较面积和时序。
+- 新增 `build_zu15eg_coremark.ps1`、`capture_zu15eg_coremark.ps1` 与 `docs/validation/coremark_board.md`：固定 50 MHz CPU、2000 iterations、32 KiB ROM，禁止 `SIMULATION_FAST_EXIT`，以 UART CRC/10 秒条件和 `CoreMark 1.0` 输出验收并计算 CoreMark/MHz。release bitstream 已完成 post-route（WNS `+8.941 ns`、TNS `0`、WHS `+0.005 ns`、THS `0`，22,667 LUT / 16,615 registers / 16 BRAM / 4 DSP，DRC 0 errors），但本机 JTAG 尚无 target，未烧写和验收；当前没有正式可声明的 CoreMark/MHz 数字。
+- 板卡随后重新枚举为 `xczu15_0`，经 USB-JTAG 易失烧写同一 release image；FTDI `COM10` 收到 CoreMark UART 原文，包含 `Correct operation validated.`、17 秒、2000 iterations 与 `Iterations/Sec=117`。固定 50 MHz 下的板级结果为 `2.34 CoreMark/MHz`。采集脚本同时兼容 `CoreMark 1.0` 和此 port 使用的 `Iterations/Sec` 输出格式；本结果为 CoreMark performance run，不是 EEMBC certified score。
+- 更新 `docs/RESUME.md`：简历表述仅保留五级 RV32IM RTL、Cache-to-AXI 数据路径、定向 UVM 验证基础、USER2 JTAG/DMI CDC 板测与 28 nm pre-layout DC/STA 的可追溯证据。明确区分上述可复现板测与历史 `SIMULATION_FAST_EXIT` 短窗口估算值；历史 `3.1906` 不作为当前性能声明。当前 full-core DC 尚未绑定匹配 PVT/端口语义的 SRAM macro，因此不得宣称 cache-inclusive ASIC PPA 或后端 sign-off。
+
 ## 2026-08-27 +08:00
 
 ### Pipeline hazard UVM 定向回归
