@@ -43,7 +43,9 @@ module jtag_top #(
     output wire op_req_o,
 
     output wire halt_req_o,
-    output wire reset_req_o
+    output wire reset_req_o,
+    // Exposed for transport integration and static-analysis observability.
+    output wire dm_resp_idle_o
 
     );
 
@@ -121,7 +123,8 @@ module jtag_top #(
         .dm_mem_rdata_i(mem_rdata_i),
         .dm_op_req_o(op_req_o),
         .dm_halt_req_o(halt_req_o),
-        .dm_reset_req_o(reset_req_o)
+        .dm_reset_req_o(reset_req_o),
+        .dm_resp_idle_o(dm_resp_idle_o)
     );
 
 endmodule

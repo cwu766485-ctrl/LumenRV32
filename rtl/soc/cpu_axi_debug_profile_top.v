@@ -18,6 +18,11 @@ module cpu_axi_debug_profile_top #(
     output wire halted_ind
 );
     wire uart_tx_unused;
+    // The CPU profile has no board-level GPIO pins.  This is deliberately an
+    // unconnected inout pad model: the GPIO block may legally drive it, while
+    // no CPU-profile test consumes the sampled input value.  Do not add a
+    // second tie-off driver, which would turn a legal resolved pad into a
+    // misleading multiple-driver lint error.
     wire [1:0] gpio_unused;
     wire spi_mosi_unused;
     wire spi_ss_unused;
@@ -26,6 +31,9 @@ module cpu_axi_debug_profile_top #(
     wire qspi_cs_n_unused;
     wire qspi_clk_unused;
 
+    // spyglass disable_block UndrivenInTerm-ML
+    // The CPU-only profile does not model external GPIO pads.  The deliberate
+    // open GPIO input is not a functional SoC connection error.
     heterogeneous_soc_top #(
         .USE_BSCAN_USER2(USE_BSCAN_USER2)
     ) u_soc (
@@ -50,4 +58,5 @@ module cpu_axi_debug_profile_top #(
         .qspi_cs_n(qspi_cs_n_unused),
         .qspi_clk(qspi_clk_unused)
     );
+    // spyglass enable_block UndrivenInTerm-ML
 endmodule

@@ -1,4 +1,24 @@
-# SpyGlass clock intent for the CPU-focused profile.
-create_clock -name cpu_clk -period 10.000 [get_ports clk]
-create_clock -name jtag_tck -period 20.000 [get_ports jtag_TCK]
-set_clock_groups -asynchronous -group {cpu_clk} -group {jtag_tck}
+# SpyGlass-native clock/reset intent for the CPU-focused profile.
+# The command names here are SGDC commands, not DC/PT SDC commands.
+current_design cpu_axi_debug_profile_top
+
+# clk is the CPU/cache/AXI clock; jtag_TCK is supplied by the BSCAN/TAP.
+# Periods are used by CDC checks only (100 MHz and a conservative 50 MHz TCK).
+clock -name clk      -domain cpu_domain  -period 10 -tag CPU_CLK
+clock -name jtag_TCK -domain tck_domain  -period 20 -tag JTAG_TCK
+sg_clock_group -group1 { CPU_CLK } -group2 { JTAG_TCK } -asynchronous
+
+# The project reset is active-low.  It asserts asynchronously and is released
+# through jtag_cdc_reset_sync independently in each clock domain.
+reset -name rst -async -value 0
+
+# This profile elaborates cpu_axi_debug_profile_top with its default
+# USE_BSCAN_USER2=0 parameter.  Its active debug path is therefore the raw
+# JTAG path below u_soc/u_jtag_top.  Do not use a wildcard here: SpyGlass
+# treats the -name argument as a concrete hierarchical terminal.
+#
+# USER2/BSCANE2 has a different hierarchy and requires a separately
+# elaborated USE_BSCAN_USER2=1 profile; it must not be claimed as covered by
+# this default raw-JTAG run.
+reset_synchronizer -name u_soc/u_jtag_top/u_tck_reset_sync/srst_n -reset rst -clock jtag_TCK -value 0
+reset_synchronizer -name u_soc/u_jtag_top/u_cpu_reset_sync/srst_n -reset rst -clock clk -value 0

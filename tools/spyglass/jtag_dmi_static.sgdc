@@ -1,0 +1,8 @@
+# SpyGlass-native clock/reset intent for verify/static/jtag_dmi_static_top.v.
+current_design jtag_dmi_static_top
+clock -name clk      -domain cpu_domain -period 10 -tag CPU_CLK
+clock -name jtag_TCK -domain tck_domain -period 20 -tag JTAG_TCK
+sg_clock_group -group1 { CPU_CLK } -group2 { JTAG_TCK } -asynchronous
+reset -name rst -async -value 0
+reset_synchronizer -name u_jtag_top/u_tck_reset_sync/srst_n -reset rst -clock jtag_TCK -value 0
+reset_synchronizer -name u_jtag_top/u_cpu_reset_sync/srst_n -reset rst -clock clk -value 0

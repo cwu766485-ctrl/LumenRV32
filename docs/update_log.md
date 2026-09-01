@@ -147,3 +147,71 @@
 - 删除脚本中硬编码的本机 Python 用户目录，将 DC 文档绝对路径改为 `<repository root>` 占位符。
 - 清除项目模板中的工具供应商名称；Apache-2.0 上游文件的版权头、`LICENSE` 与 `NOTICE` 仍保留。
 - 本次仅完成公开源树收敛；新的 CPU/DMA SoC XSim、FPGA 和板测验收须在当前 commit 重新执行。
+## 2026-08-30 +08:00
+
+### LumenRV32 面试电子笔记编排
+
+- 新增并编排 `docs/LUMENRV32_NOTEBOOK.md`，作为 Lumen 工作区唯一的项目学习主入口；包含目录、阅读路径、CPU 微架构、memory subsystem、AXI/control plane、PMU、directed UVM、CDC/USER2 DMI、DC/STA/PPA、波形阅读和面试边界。
+- 按 Part I--VII 重编为可点击目录，并补入 RV32M 实现取舍、USER2 板测与 raw-JTAG static CDC 覆盖边界、外设/控制平面地图、CoreMark/PPA 的可用证据、面试追问矩阵与开源来源表述。
+- 文档对每项验证证据显式标出范围：directed UVM 不等于 coverage closure，custom USER2 DMI 不等于完整 RISC-V Debug Spec，CDC 异步仿真不等于 static CDC/RDC sign-off，28 nm DC 不等于 post-layout ASIC sign-off。
+
+## 2026-08-30 +08:00
+
+### SpyGlass CDC/RDC 约束修正
+
+- 将 `tools/spyglass/cpu_profile.sgdc` 从不兼容的 DC/STA `create_clock`、`set_clock_groups` 写法改为 SpyGlass 原生 `clock`、`sg_clock_group`、`reset` 和 `reset_synchronizer` 约束；明确 `clk` 与 BSCAN USER2 的 `jtag_TCK` 为异步时钟域。
+- 删除当前 SpyGlass V-2023.12-SP1 不支持的 `handle_large_bus` 参数；保留既有大内存 elaboration 配置，避免用参数掩盖 RTL 规则问题。
+- 历史 CDC 尝试曾通过 SGDC 解析并进入完整 RTL elaboration，但因 reset synchronizer 的层级名不匹配而未完成规则检查；当前已改为默认 raw-JTAG profile 的实际层级。2026-08-31 的单次串行重跑在 SpyGlass 规则启动前因 `checker 2023.12` license 无法连接 `27000@localhost` 中止。因此 CDC/RDC 均未签收，不能标记 clean；待许可证恢复后必须串行重跑 CDC，再跑 RDC 并审阅 report/waiver。验证命令和日志保留在被 Git 忽略的 `build/spyglass_cpu/`。
+- 随后 CDC 已完成 534 条规则：`0 fatal / 0 error / 5 warning`，其中 `Ac_unsync01/02=0`，并报告一个 `jtag_dm.resp_pending` handshake convergence 待审阅。RDC 首次在大行为 memory elaboration 阶段耗时过长；将 `mthresh` 降至 1024 的试验虽能快速完成 elaboration，却产生了 8 个 memory/cache blackbox synthesis error，因此已撤回，不能作为 RDC 结果。恢复原 `mthresh=1048576` 后再次运行 RDC，确认 `Ar_resetcross01/Ar_resetcross_matrix01` 因缺少 `rdc_adv_checker` license feature 未执行；RDC 未签收，需 CAD 管理员提供该 feature 后重跑并审阅报告。
+
+### 面试笔记：协议、微架构、验证与时序增补
+
+- 扩充 `docs/LUMENRV32_NOTEBOOK.md`：明确 I/D Cache → native-to-AXI4 → AXI4 fabric → memory/control-island 的真实协议边界，区分 AXI4-Lite 专用寄存器窗口与 AXI4-to-APB 低速外设路径，并说明同源 `pclk` 分频不是天然异步 CDC。
+- 增补 async-assert/sync-deassert reset synchronizer 的 RTL、静态 CDC/RDC 证据边界、EX-to-JALR hazard 条件和逐周期 interlock/late-forwarding 过程，以及 directed UVM 的刺激、检查与未覆盖边界。
+
+## 2026-08-31 +08:00
+
+### SpyGlass CDC raw-JTAG profile hierarchy correction
+
+- The default `cpu_axi_debug_profile_top` elaboration uses `USE_BSCAN_USER2=0`; its active reset synchronizers are `u_soc/u_jtag_top/u_tck_reset_sync/srst_n` and `u_soc/u_jtag_top/u_cpu_reset_sync/srst_n`. Replaced unsupported wildcard names in `cpu_profile.sgdc` with these concrete hierarchy terminals.
+- Kept USER2/BSCANE2 explicitly out of this raw-JTAG profile. A future USER2 static CDC run must elaborate `fpga/zu15eg_cpu_jtag_user2_top.v` (or an equivalent wrapper) with `USE_BSCAN_USER2=1` and use its separate transport hierarchy; this run must not be described as USER2 static CDC coverage.
+
+### SpyGlass JTAG-DMI focused CDC/RDC cleanup
+
+- Added `verify/static/jtag_dmi_static_top.v`, `tools/spyglass/jtag_dmi_static.sgdc`, and `jtag-cdc` / `jtag-rdc` runner modes. These focused goals elaborate the real raw-JTAG DMI transport but tie off CPU debug targets; they are a rapid transport-level structural check, not full-SoC or USER2 static sign-off.
+- Added a CDC/RDC-only, port-compatible `axi4_mem_model` stub to the full-SoC runner. The functional 64K-word model remains unchanged for simulation and implementation; the stub only avoids unnecessary behavioural-memory elaboration during structural static checks.
+- Fixed six focused RDC `Ar_resetcross01` violations by adding asynchronous reset behavior to `jtag_driver` shift register, instruction register, and TDO register. Fresh focused RDC: `0 fatal / 0 error / 0 warning`; fresh focused CDC: `0 fatal / 0 error / 3 warning`, `Unsynchronized clock domain crossings = 0`.
+- The three focused CDC warnings (`resp_pending` synchronizer convergence and two shared-reset topology messages) remain unwaived pending protocol/reset review. Full-SoC CDC/RDC and USER2/BSCANE2 static coverage remain open; do not claim static sign-off.
+
+- Refactored the raw JTAG TAP and four-phase handshake FSMs into explicit
+  next-state decode plus sequential state registers, removed unused DMI
+  response-data state, and made the SoC JTAG debug outputs reset-safe. Fresh focused
+  `jtag-lint`: `0 fatal / 0 error / 0 warning`; `jtag-cdc` remains
+  `0 fatal / 0 error / 3 reviewed warning`; `jtag-rdc` remains
+  `0 fatal / 0 error / 0 warning`. The asynchronous CDC directed testbench
+  passed as `JTAG_DMI_CDC_TB_PASS`.
+
+### SpyGlass full-SoC 静态检查收敛（2026-09-01）
+
+- full-SoC `lint`、`cdc` 与 `rdc` 统一改用 port-compatible static
+  `axi4_mem_model` stub；功能仿真、综合和 FPGA implementation 继续使用原
+  behavioural model。Lint 仅为 W123 启用 `handle_large_bus`，CDC/RDC 不再
+  报该参数无效。
+- CPU profile 修复内部 I2C open-drain idle pull-up；未引出的 GPIO inout 保留
+  为 profile-only 局部 waiver。新鲜 full Lint 为 0 fatal / 0 reported error /
+  403 warning / 1 local waiver；full CDC 为 0 fatal / 0 error / 3 reviewed
+  warning，`Unsynchronized clock domain crossings = 0`。
+- full RDC 已实际运行并 checkout `Advanced_RDC`，但基线仍有 257 条
+  `Ar_resetcross01`，均为 raw-JTAG CPU-domain transport 的 async-reset state
+  到同步-reset CPU architectural state 的 reset-style mismatch。RDC 未签收；
+  后续必须完成统一 reset-style 设计或受控 waiver 审阅，不能写为 clean。
+
+### SpyGlass full-SoC Lint memory abstraction
+
+- Full-SoC `lint` now uses the same port-compatible `axi4_mem_model` static
+  stub already used by `cdc` and `rdc`. This avoids elaborating the 64K-word
+  behavioural memory model during structural analysis; functional simulation
+  and implementation continue to use the production model.
+- Replaced a long-running pre-fix full-Lint invocation rather than treating its
+  partial output as a result. Full-SoC Lint/CDC/RDC must be run serially after
+  this change, and each final report must be reviewed before any clean claim.

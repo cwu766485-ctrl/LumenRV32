@@ -146,6 +146,13 @@ module heterogeneous_soc_top #(
     // SOC_I2C_EXTERNAL_PINS only with verified board XDC pin assignments.
     tri i2c_scl;
     tri i2c_sda;
+`ifndef SOC_I2C_EXTERNAL_PINS
+    // The CPU-focused profile keeps I2C internal.  Model the idle open-drain
+    // bus explicitly so its peripheral inputs are not floating in static RTL
+    // analysis; board-level builds provide these pulls externally.
+    pullup (i2c_scl);
+    pullup (i2c_sda);
+`endif
 `endif
 
     wire[`MemAddrBus] dma_addr;
@@ -457,15 +464,34 @@ module heterogeneous_soc_top #(
     wire[`MemBus] bscan_jtag_mem_wdata;
     wire bscan_jtag_mem_req;
     wire[`MemBus] bscan_jtag_mem_rdata;
-    wire jtag_halt_req = USE_BSCAN_USER2 ? bscan_jtag_halt_req_o : jtag_halt_req_o;
-    wire jtag_reset_req = USE_BSCAN_USER2 ? bscan_jtag_reset_req_o : jtag_reset_req_o;
-    wire[`RegAddrBus] jtag_reg_addr = USE_BSCAN_USER2 ? bscan_jtag_reg_addr_o : jtag_reg_addr_o;
-    wire[`RegBus] jtag_reg_data = USE_BSCAN_USER2 ? bscan_jtag_reg_data_o : jtag_reg_data_o;
-    wire jtag_reg_we = USE_BSCAN_USER2 ? bscan_jtag_reg_we_o : jtag_reg_we_o;
-    wire jtag_mem_we_selected = USE_BSCAN_USER2 ? bscan_jtag_mem_we : jtag_mem_we;
-    wire[`MemAddrBus] jtag_mem_addr_selected = USE_BSCAN_USER2 ? bscan_jtag_mem_addr : jtag_mem_addr;
-    wire[`MemBus] jtag_mem_wdata_selected = USE_BSCAN_USER2 ? bscan_jtag_mem_wdata : jtag_mem_wdata;
-    wire jtag_mem_req_selected = USE_BSCAN_USER2 ? bscan_jtag_mem_req : jtag_mem_req;
+    wire jtag_halt_req_raw = USE_BSCAN_USER2 ? bscan_jtag_halt_req_o : jtag_halt_req_o;
+    wire jtag_reset_req_raw = USE_BSCAN_USER2 ? bscan_jtag_reset_req_o : jtag_reset_req_o;
+    wire[`RegAddrBus] jtag_reg_addr_raw = USE_BSCAN_USER2 ? bscan_jtag_reg_addr_o : jtag_reg_addr_o;
+    wire[`RegBus] jtag_reg_data_raw = USE_BSCAN_USER2 ? bscan_jtag_reg_data_o : jtag_reg_data_o;
+    wire jtag_reg_we_raw = USE_BSCAN_USER2 ? bscan_jtag_reg_we_o : jtag_reg_we_o;
+    wire jtag_mem_we_raw = USE_BSCAN_USER2 ? bscan_jtag_mem_we : jtag_mem_we;
+    wire[`MemAddrBus] jtag_mem_addr_raw = USE_BSCAN_USER2 ? bscan_jtag_mem_addr : jtag_mem_addr;
+    wire[`MemBus] jtag_mem_wdata_raw = USE_BSCAN_USER2 ? bscan_jtag_mem_wdata : jtag_mem_wdata;
+    wire jtag_mem_req_raw = USE_BSCAN_USER2 ? bscan_jtag_mem_req : jtag_mem_req;
+
+    // rst is active low.  The JTAG CPU-domain endpoint leaves reset after a
+    // local two-flop release synchronizer, while most legacy SoC blocks use
+    // synchronous reset.  Clamp every debug control-plane input to its idle
+    // value while reset is asserted.  This makes the reset-safe interface
+    // explicit: an asynchronously resetting debug flop cannot request a GPR
+    // write, memory operation, halt, or CPU reset before the SoC is running.
+    // Keep debug requests inactive during system reset.  The CPU profile
+    // shares this synchronous system reset between JTAG-DM and architectural
+    // state; static RDC intent models that common-reset relationship.
+    wire jtag_halt_req = rst ? jtag_halt_req_raw : 1'b0;
+    wire jtag_reset_req = rst ? jtag_reset_req_raw : 1'b0;
+    wire[`RegAddrBus] jtag_reg_addr = rst ? jtag_reg_addr_raw : `ZeroReg;
+    wire[`RegBus] jtag_reg_data = rst ? jtag_reg_data_raw : `ZeroWord;
+    wire jtag_reg_we = rst ? jtag_reg_we_raw : 1'b0;
+    wire jtag_mem_we_selected = rst ? jtag_mem_we_raw : 1'b0;
+    wire[`MemAddrBus] jtag_mem_addr_selected = rst ? jtag_mem_addr_raw : `ZeroWord;
+    wire[`MemBus] jtag_mem_wdata_selected = rst ? jtag_mem_wdata_raw : `ZeroWord;
+    wire jtag_mem_req_selected = rst ? jtag_mem_req_raw : 1'b0;
 
     // RISC-V CPU core
     wire[`INT_BUS] int_flag;

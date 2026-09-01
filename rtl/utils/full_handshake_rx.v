@@ -37,6 +37,7 @@ module full_handshake_rx #(
     localparam STATE_WAIT_REQ_DROP = 1'b1;
 
     reg state;
+    reg state_n;
     // req_i is generated in the transmitting clock domain. Preserve this
     // two-flop chain as a CDC synchronizer during synthesis and placement.
     (* ASYNC_REG = "TRUE" *) reg req_sync_d;
@@ -53,6 +54,26 @@ module full_handshake_rx #(
             req_sync_d <= req_i;
             req_sync <= req_sync_d;
         end
+    end
+
+    // Keep state transition decode separate from the sequential handshake
+    // registers. This preserves the four-phase protocol while making the
+    // FSM explicit to static analysis.
+    always @(*) begin
+        state_n = state;
+        case (state)
+            STATE_IDLE: begin
+                if (req_sync == 1'b1) begin
+                    state_n = STATE_WAIT_REQ_DROP;
+                end
+            end
+            STATE_WAIT_REQ_DROP: begin
+                if (req_sync == 1'b0) begin
+                    state_n = STATE_IDLE;
+                end
+            end
+            default: state_n = STATE_IDLE;
+        endcase
     end
 
     always @ (posedge clk or negedge rst_n) begin
@@ -72,16 +93,15 @@ module full_handshake_rx #(
                         // The transmitter holds it stable from req assertion
                         // through the full acknowledge handshake.
                         recv_data_r <= req_data_i;
-                        state <= STATE_WAIT_REQ_DROP;
                     end
                 end
                 STATE_WAIT_REQ_DROP: begin
                     if (req_sync == 1'b0) begin
                         ack_r <= 1'b0;
-                        state <= STATE_IDLE;
                     end
                 end
             endcase
+            state <= state_n;
         end
     end
 

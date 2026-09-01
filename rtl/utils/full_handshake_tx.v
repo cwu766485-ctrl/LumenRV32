@@ -39,6 +39,7 @@ module full_handshake_tx #(
     localparam STATE_WAIT_ACK_DROP = 2'b10;
 
     reg[1:0] state;
+    reg[1:0] state_n;
     // ack_i is generated in the receiving clock domain. Preserve this
     // two-flop chain as a CDC synchronizer during synthesis and placement.
     (* ASYNC_REG = "TRUE" *) reg ack_sync_d;
@@ -55,6 +56,30 @@ module full_handshake_tx #(
             ack_sync_d <= ack_i;
             ack_sync <= ack_sync_d;
         end
+    end
+
+    // The four-phase protocol transition table is combinational; payload and
+    // request registers remain in the sequential block below.
+    always @(*) begin
+        state_n = state;
+        case (state)
+            STATE_IDLE: begin
+                if (req_i == 1'b1) begin
+                    state_n = STATE_WAIT_ACK;
+                end
+            end
+            STATE_WAIT_ACK: begin
+                if (ack_sync == 1'b1) begin
+                    state_n = STATE_WAIT_ACK_DROP;
+                end
+            end
+            STATE_WAIT_ACK_DROP: begin
+                if (ack_sync == 1'b0) begin
+                    state_n = STATE_IDLE;
+                end
+            end
+            default: state_n = STATE_IDLE;
+        endcase
     end
 
     always @ (posedge clk or negedge rst_n) begin
@@ -75,29 +100,26 @@ module full_handshake_tx #(
                         // acknowledged it. The receiver samples the bundle
                         // only after req has crossed its two-flop synchronizer.
                         req_data_r <= req_data_i;
-                        state <= STATE_WAIT_ACK;
                     end
                 end
                 STATE_WAIT_ACK: begin
                     if (ack_sync == 1'b1) begin
                         req_r <= 1'b0;
-                        state <= STATE_WAIT_ACK_DROP;
                     end
                 end
                 STATE_WAIT_ACK_DROP: begin
                     if (ack_sync == 1'b0) begin
                         idle_r <= 1'b1;
                         req_data_r <= {DW{1'b0}};
-                        state <= STATE_IDLE;
                     end
                 end
                 default: begin
-                    state <= STATE_IDLE;
                     idle_r <= 1'b1;
                     req_r <= 1'b0;
                     req_data_r <= {DW{1'b0}};
                 end
             endcase
+            state <= state_n;
         end
     end
 

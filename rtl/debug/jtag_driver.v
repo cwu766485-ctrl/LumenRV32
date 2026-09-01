@@ -97,6 +97,7 @@ module jtag_driver #(
     reg[IR_BITS - 1:0] ir_reg;
     reg[SHIFT_REG_BITS - 1:0] shift_reg;
     reg[3:0] jtag_state;
+    reg[3:0] jtag_state_n;
     wire is_busy;
     reg sticky_busy;
     // A DMI UPDATE_DR is legal only after this TAP has captured the DMI data
@@ -138,35 +139,44 @@ module jtag_driver #(
     assign is_busy = sticky_busy | dm_is_busy;
     assign dmi_stat = is_busy ? 2'b01 : 2'b00;
 
-    // state switch
+    // TAP next-state decode is separated from its state register so the
+    // legal JTAG transition table is auditable and lint can check the FSM.
+    always @(*) begin
+        jtag_state_n = TEST_LOGIC_RESET;
+        case (jtag_state)
+            TEST_LOGIC_RESET  : jtag_state_n = jtag_TMS ? TEST_LOGIC_RESET : RUN_TEST_IDLE;
+            RUN_TEST_IDLE     : jtag_state_n = jtag_TMS ? SELECT_DR        : RUN_TEST_IDLE;
+            SELECT_DR         : jtag_state_n = jtag_TMS ? SELECT_IR        : CAPTURE_DR;
+            CAPTURE_DR        : jtag_state_n = jtag_TMS ? EXIT1_DR         : SHIFT_DR;
+            SHIFT_DR          : jtag_state_n = jtag_TMS ? EXIT1_DR         : SHIFT_DR;
+            EXIT1_DR          : jtag_state_n = jtag_TMS ? UPDATE_DR        : PAUSE_DR;
+            PAUSE_DR          : jtag_state_n = jtag_TMS ? EXIT2_DR         : PAUSE_DR;
+            EXIT2_DR          : jtag_state_n = jtag_TMS ? UPDATE_DR        : SHIFT_DR;
+            UPDATE_DR         : jtag_state_n = jtag_TMS ? SELECT_DR        : RUN_TEST_IDLE;
+            SELECT_IR         : jtag_state_n = jtag_TMS ? TEST_LOGIC_RESET : CAPTURE_IR;
+            CAPTURE_IR        : jtag_state_n = jtag_TMS ? EXIT1_IR         : SHIFT_IR;
+            SHIFT_IR          : jtag_state_n = jtag_TMS ? EXIT1_IR         : SHIFT_IR;
+            EXIT1_IR          : jtag_state_n = jtag_TMS ? UPDATE_IR        : PAUSE_IR;
+            PAUSE_IR          : jtag_state_n = jtag_TMS ? EXIT2_IR         : PAUSE_IR;
+            EXIT2_IR          : jtag_state_n = jtag_TMS ? UPDATE_IR        : SHIFT_IR;
+            UPDATE_IR         : jtag_state_n = jtag_TMS ? SELECT_DR        : RUN_TEST_IDLE;
+            default           : jtag_state_n = TEST_LOGIC_RESET;
+        endcase
+    end
+
     always @(posedge jtag_TCK or negedge rst_n) begin
         if (!rst_n) begin
             jtag_state <= TEST_LOGIC_RESET;
         end else begin
-            case (jtag_state)
-                TEST_LOGIC_RESET  : jtag_state <= jtag_TMS ? TEST_LOGIC_RESET : RUN_TEST_IDLE;
-                RUN_TEST_IDLE     : jtag_state <= jtag_TMS ? SELECT_DR        : RUN_TEST_IDLE;
-                SELECT_DR         : jtag_state <= jtag_TMS ? SELECT_IR        : CAPTURE_DR;
-                CAPTURE_DR        : jtag_state <= jtag_TMS ? EXIT1_DR         : SHIFT_DR;
-                SHIFT_DR          : jtag_state <= jtag_TMS ? EXIT1_DR         : SHIFT_DR;
-                EXIT1_DR          : jtag_state <= jtag_TMS ? UPDATE_DR        : PAUSE_DR;
-                PAUSE_DR          : jtag_state <= jtag_TMS ? EXIT2_DR         : PAUSE_DR;
-                EXIT2_DR          : jtag_state <= jtag_TMS ? UPDATE_DR        : SHIFT_DR;
-                UPDATE_DR         : jtag_state <= jtag_TMS ? SELECT_DR        : RUN_TEST_IDLE;
-                SELECT_IR         : jtag_state <= jtag_TMS ? TEST_LOGIC_RESET : CAPTURE_IR;
-                CAPTURE_IR        : jtag_state <= jtag_TMS ? EXIT1_IR         : SHIFT_IR;
-                SHIFT_IR          : jtag_state <= jtag_TMS ? EXIT1_IR         : SHIFT_IR;
-                EXIT1_IR          : jtag_state <= jtag_TMS ? UPDATE_IR        : PAUSE_IR;
-                PAUSE_IR          : jtag_state <= jtag_TMS ? EXIT2_IR         : PAUSE_IR;
-                EXIT2_IR          : jtag_state <= jtag_TMS ? UPDATE_IR        : SHIFT_IR;
-                UPDATE_IR         : jtag_state <= jtag_TMS ? SELECT_DR        : RUN_TEST_IDLE; 
-            endcase
+            jtag_state <= jtag_state_n;
         end
     end
 
     // IR or DR shift
-    always @(posedge jtag_TCK) begin
-        case (jtag_state)
+    always @(posedge jtag_TCK or negedge rst_n) begin
+        if (!rst_n) begin
+            shift_reg <= {SHIFT_REG_BITS{1'b0}};
+        end else case (jtag_state)
             // IR
             CAPTURE_IR: shift_reg <= {{(SHIFT_REG_BITS - 1){1'b0}}, 1'b1}; //JTAG spec says it must be b01
             SHIFT_IR  : shift_reg <= {{(SHIFT_REG_BITS - IR_BITS){1'b0}}, jtag_TDI, shift_reg[IR_BITS - 1:1]}; // right shift 1 bit
@@ -199,8 +209,8 @@ module jtag_driver #(
         end else begin
             if ((jtag_state == CAPTURE_DR) && (ir_reg == REG_DMI)) begin
                 dmi_capture_seen <= 1'b1;
-            end
-            if (jtag_state == UPDATE_DR) begin
+                dtm_req_valid <= `DTM_REQ_INVALID;
+            end else if (jtag_state == UPDATE_DR) begin
                 if ((ir_reg == REG_DMI) && dmi_capture_seen) begin
                     // if DM can be access
                     if (!is_busy & tx_idle) begin
@@ -260,8 +270,10 @@ module jtag_driver #(
     end
 
     // TAP reset
-    always @(negedge jtag_TCK) begin
-        if (jtag_state == TEST_LOGIC_RESET) begin
+    always @(negedge jtag_TCK or negedge rst_n) begin
+        if (!rst_n) begin
+            ir_reg <= REG_IDCODE;
+        end else if (jtag_state == TEST_LOGIC_RESET) begin
             ir_reg <= REG_IDCODE;
         end else if (jtag_state == UPDATE_IR) begin
             ir_reg <= shift_reg[IR_BITS - 1:0];
@@ -269,8 +281,10 @@ module jtag_driver #(
     end
 
     // TDO output
-    always @(negedge jtag_TCK) begin
-        if (jtag_state == SHIFT_IR) begin
+    always @(negedge jtag_TCK or negedge rst_n) begin
+        if (!rst_n) begin
+            jtag_TDO <= 1'b0;
+        end else if (jtag_state == SHIFT_IR) begin
             jtag_TDO <= shift_reg[0];
         end else if (jtag_state == SHIFT_DR) begin
             jtag_TDO <= shift_reg[0];

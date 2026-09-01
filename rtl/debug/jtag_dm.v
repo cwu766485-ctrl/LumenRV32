@@ -88,7 +88,8 @@ module jtag_dm #(
     output wire dm_halt_req_o;
     output wire dm_reset_req_o;
     // CPU-domain indication that the one-entry DMI response sender has
-    // completed its entire four-phase transaction.
+    // completed its full four-phase transaction. The USER2 transport uses
+    // this status to sequence requests, so keep it in the public interface.
     output wire dm_resp_idle_o;
 
     // DM????????
@@ -100,8 +101,6 @@ module jtag_dm #(
     reg[31:0] data0;
     reg[31:0] sbcs;
     reg[31:0] sbaddress0;
-    reg[31:0] sbdata0;
-    reg[31:0] command;
 
     // DM???????????
     localparam DCSR       = 16'h7b0;
@@ -118,7 +117,6 @@ module jtag_dm #(
 
     localparam OP_SUCC = 2'b00;
 
-    reg[31:0] read_data;
     reg dm_reg_we;
     reg[4:0] dm_reg_addr;
     reg[31:0] dm_reg_wdata;
@@ -172,13 +170,10 @@ module jtag_dm #(
             dmcontrol <= 32'h0;
             abstractcs <= 32'h1000003;
             data0 <= 32'h0;
-            sbdata0 <= 32'h0;
-            command <= 32'h0;
             dm_reg_wdata <= 32'h0;
             dm_mem_wdata <= 32'h0;
             dmstatus <= 32'h430c82;
             is_read_reg <= 1'b0;
-            read_data <= 32'h0;
             resp_pending <= 1'b0;
             resp_addr <= {DMI_ADDR_BITS{1'b0}};
             resp_read_data <= {DMI_DATA_BITS{1'b0}};
@@ -186,8 +181,6 @@ module jtag_dm #(
             // full_handshake_tx samples resp_pending while it is idle, then
             // holds resp_addr/resp_read_data internally for the full CDC
             // transfer. Clear this slot only after that sampling edge.
-            if (resp_pending && tx_idle)
-                resp_pending <= 1'b0;
             if (rx_valid) begin
                 resp_pending <= 1'b1;
                 resp_addr <= address;
@@ -196,37 +189,29 @@ module jtag_dm #(
                     `DTM_OP_READ: begin
                         case (address)
                             DMSTATUS: begin
-                                read_data <= dmstatus_live;
                                 resp_read_data <= dmstatus_live;
                             end
                             DMCONTROL: begin
-                                read_data <= dmcontrol;
                                 resp_read_data <= dmcontrol;
                             end
                             HARTINFO: begin
-                                read_data <= hartinfo;
                                 resp_read_data <= hartinfo;
                             end
                             SBCS: begin
-                                read_data <= sbcs;
                                 resp_read_data <= sbcs;
                             end
                             ABSTRACTCS: begin
-                                read_data <= abstractcs;
                                 resp_read_data <= abstractcs;
                             end
                             DATA0: begin
                                 if (is_read_reg == 1'b1) begin
-                                    read_data <= dm_reg_rdata_i;
                                     resp_read_data <= dm_reg_rdata_i;
                                 end else begin
-                                    read_data <= data0;
                                     resp_read_data <= data0;
                                 end
                                 is_read_reg <= 1'b0;
                             end
                             SBDATA0: begin
-                                read_data <= dm_mem_rdata_i;
                                 resp_read_data <= dm_mem_rdata_i;
                                 if (sbcs[16] == 1'b1) begin
                                     sbaddress0 <= sbaddress0_next;
@@ -236,13 +221,12 @@ module jtag_dm #(
                                 end
                             end
                             default: begin
-                                read_data <= {(DMI_DATA_BITS){1'b0}};
+                                resp_read_data <= {(DMI_DATA_BITS){1'b0}};
                             end
                         endcase
                     end
 
                     `DTM_OP_WRITE: begin
-                        read_data <= {(DMI_DATA_BITS){1'b0}};
                         case (address)
                             DMCONTROL: begin
                                 // reset DM module
@@ -318,7 +302,6 @@ module jtag_dm #(
                                 end
                             end
                             SBDATA0: begin
-                                sbdata0 <= data;
                                 dm_mem_addr <= sbaddress0;
                                 dm_mem_wdata <= data;
                                 dm_mem_we <= 1'b1;
@@ -330,9 +313,10 @@ module jtag_dm #(
                     end
 
                     `DTM_OP_NOP: begin
-                        read_data <= {(DMI_DATA_BITS){1'b0}};
                     end
                 endcase
+            end else if (resp_pending && tx_idle) begin
+                resp_pending <= 1'b0;
             end else begin
                 dm_mem_we <= 1'b0;
                 dm_reg_we <= 1'b0;
