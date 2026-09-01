@@ -206,6 +206,12 @@
   到同步-reset CPU architectural state 的 reset-style mismatch。RDC 未签收；
   后续必须完成统一 reset-style 设计或受控 waiver 审阅，不能写为 clean。
 
+### 面试笔记 UTF-8 恢复（2026-09-01）
+
+- `docs/LUMENRV32_NOTEBOOK.md` 曾被错误按 GBK 读取后再以 UTF-8 保存，导致
+  中文出现 mojibake。已从 VS Code local history 恢复最新正常 UTF-8 版本，并
+  验证无 replacement character、无 BOM 且 `git diff --check` 通过。
+
 ### SpyGlass full-SoC Lint memory abstraction
 
 - Full-SoC `lint` now uses the same port-compatible `axi4_mem_model` static
